@@ -1,0 +1,36 @@
+# Eclipse config files
+# The following because OcaIDE changes the path file regularly...
+/.paths
+
+# OASIS temp files
+/_build
+/*.byte
+/*.native
+/setup.*
+
+# Python temp files
+__pycache__
+
+# Execution temp files
+/*.log
+
+# Generated graph files
+/*.dot
+/*.pdf
+/*.log.json
+
+# Custom build configuration files
+/.local_*
+
+# Scratch location
+/local
+
+# Dune creates its own .merlin files
+.merlin
+
+# Dune intermediates
+/*.install
+
+# Makefile temporaries
+/*toploop
+/translator

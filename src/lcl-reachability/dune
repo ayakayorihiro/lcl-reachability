@@ -1,0 +1,14 @@
+(library
+  (name lcl_reachability)
+  (public_name lcl_reachability.reachability)
+  (synopsis "Implementation of LCL reachability algorithm for graph closure")
+  (libraries
+    batteries
+    jhupllib
+  )
+  (preprocess
+    (pps
+      ppx_deriving.std
+    )
+  )
+)
