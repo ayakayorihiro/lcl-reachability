@@ -1,37 +1,8 @@
 open Batteries;;
+open Closure;;
 open Graph_types;;
 open Stack_utils;;
 open Utils;;
-
-(* Data type for module for constructing graph and computing the
-   reachability question. *)
-module type Reachability =
-sig
-  module LeftGrammar : Stack_grammar
-  module RightGrammar : Stack_grammar
-  module G : Graph
-    with type Label.t = ((LeftGrammar.t, RightGrammar.t) choice) stack_action
-
-  (* Want to define a type for DSTM states - want to take the stack grammars from
-     the graph and define states based on them *)
-
-  (* Same deal for contents of DSTM tape - contains the "open" expressions from
-     both stack grammars, plus the "done" (#) symbol *)
-
-  (* Summary of two-stack graph *)
-  type summary
-
-  val create_initial_summary : G.t -> summary
-
-  val step : summary -> summary option
-
-  val step_to_closure : summary -> summary
-
-  val reachable : G.Node.t -> G.Node.t -> summary -> bool
-
-  (* val show_summary : summary -> string *)
-
-end;;
 
 (** Functor - takes in graph type, and creates module for
     dealing with specific graph and reachability question.
@@ -283,8 +254,8 @@ struct
 
   let step (curr_summary : summary) : summary option =
     (* NOTE: For debugging purposes *)
-    (* print_endline "" ;
-    print_endline @@ show_summary curr_summary ; *)
+    print_endline "" ;
+    print_endline @@ show_summary curr_summary ;
     let curr_graph = curr_summary.graph in
     let curr_worklist = curr_summary.worklist in
     match curr_worklist with
