@@ -24,7 +24,7 @@ end;;
 module Test_stack_elm_1 =
 struct
   type t = int
-  let alphabet = [1;2;3;4;5]
+  (* type alphabet = int  *)
   let equal = (==)
   let compare = compare
   let pp = Format.pp_print_int
@@ -34,7 +34,7 @@ end;;
 module Test_stack_elm_2 =
 struct
   type t = int
-  let alphabet = [1;2;3;4;5]
+  (* let alphabet = [1;2;3;4;5] *)
   let equal = (==)
   let compare = compare
   let pp = Format.pp_print_int

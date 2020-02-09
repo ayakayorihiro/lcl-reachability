@@ -1,9 +1,11 @@
 (* open Batteries;;
 open Jhupllib;; *)
-open OUnit2
+open OUnit2;;
 
 let all_tests =
-  [ Test_reachability.tests;
+  [
+    Generate_tests.tests;
+    (* Test_reachability.tests; *)
     (* Test_reachability_primes.tests *)
   ];;
 

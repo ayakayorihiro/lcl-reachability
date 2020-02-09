@@ -4,7 +4,7 @@ open Utils;;
 module type Stack_grammar =
 sig
   include Decorated_type;;
-  val alphabet : t list
+  (* type alphabet *)
 end;;
 
 (* equivalent to Haskell Either *)

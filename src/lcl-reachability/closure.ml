@@ -315,7 +315,7 @@ struct
       in
       (* OUTGOING NEIGHBORS OF TGT *)
       let outgoing_evaluation =
-        List.fold_left
+        Enum.fold
           (fun curr_sum -> fun (curr_outedge : (N.t * L.t)) ->
              let curr_left_z = curr_sum.left_z in
              let curr_right_q = curr_sum.right_q in
@@ -375,7 +375,7 @@ struct
       in
       (* INCOMING NEIGHBORS OF SRC *)
       let incoming_evaluation =
-        List.fold_left
+        Enum.fold 
           (fun curr_sum -> fun (curr_inedge : (N.t * L.t)) ->
              let curr_left_z = curr_sum.left_z in
              let curr_right_q = curr_sum.right_q in
