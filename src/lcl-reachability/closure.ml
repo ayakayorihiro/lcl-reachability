@@ -355,7 +355,10 @@ struct
                         Reachability_graph.insert_edge new_edge acc_graph
                       in
                       let result_worklist =
-                        List.append acc_worklist [new_edge]
+                        if (not (Reachability_graph.contains_edge new_edge acc_summ.graph))
+                        then
+                          List.append acc_worklist [new_edge]
+                        else acc_worklist
                       in
                       {
                         graph = result_graph;
@@ -375,7 +378,7 @@ struct
       in
       (* INCOMING NEIGHBORS OF SRC *)
       let incoming_evaluation =
-        Enum.fold 
+        Enum.fold
           (fun curr_sum -> fun (curr_inedge : (N.t * L.t)) ->
              let curr_left_z = curr_sum.left_z in
              let curr_right_q = curr_sum.right_q in
@@ -415,7 +418,9 @@ struct
                         Reachability_graph.insert_edge new_edge acc_graph
                       in
                       let result_worklist =
-                        List.append acc_worklist [new_edge]
+                        if (not (Reachability_graph.contains_edge new_edge acc_summary.graph))
+                        then List.append acc_worklist [new_edge]
+                        else acc_worklist
                       in
                       {
                         graph = result_graph;

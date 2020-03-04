@@ -1,0 +1,16 @@
+(library
+   (name lcl_reachability_tests)
+   (public_name lcl_reachability.test_lib)
+   (synopsis "Library for testing LCL reachability")
+   (libraries
+     oUnit
+     batteries
+     jhupllib
+     lcl_reachability
+   )
+   (preprocess
+     (pps
+       ppx_deriving.std
+     )
+   )
+ )

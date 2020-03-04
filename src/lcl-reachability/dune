@@ -5,10 +5,12 @@
   (libraries
     batteries
     jhupllib
+    monadlib
   )
   (preprocess
     (pps
       ppx_deriving.std
+      ocaml-monadic
     )
   )
 )

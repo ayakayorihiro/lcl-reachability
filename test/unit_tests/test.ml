@@ -2,10 +2,12 @@
 open Jhupllib;; *)
 open OUnit2;;
 
+Random.init 15;;
+
 let all_tests =
   [
-    Generate_tests.tests;
-    (* Test_reachability.tests; *)
+    Lcl_reachability_tests.Generate_tests.tests;
+    Test_reachability.tests;
     (* Test_reachability_primes.tests *)
   ];;
 

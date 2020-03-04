@@ -1,0 +1,17 @@
+(executable
+  (name sandbox)
+  (public_name sandbox)
+  (libraries
+    oUnit
+    ppx_deriving_yojson.runtime
+    lcl_reachability
+    lcl_reachability.test_lib
+  )
+  (preprocess
+    (pps
+      ppx_deriving.std
+      ppx_deriving_yojson
+    )
+  )
+  (flags (:standard (-w -39)))
+)

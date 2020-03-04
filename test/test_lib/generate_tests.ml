@@ -4,34 +4,39 @@ open Lcl_reachability.Stack_utils;;
 
 module Closure = Lcl_reachability.Closure;;
 module Closure2 = Lcl_reachability.Closure_algorithm2;;
+module New_closure = Lcl_reachability.New_closure;;
 module Graph_types = Lcl_reachability.Graph_types;;
 
 type probabilities = {terminal : int; nest : int; concat : int};;
 
 let initial_probabilities : probabilities =
   {
-    terminal = 20;
-    nest = 30;
-    concat = 50
+    terminal = 10;
+    nest = 100;
+    concat = 100
   }
 ;;
 
+let nest_factor = 0.9;;
+let concat_factor = 0.8;;
+
 (* returns a list of numbers, as well as the new count *)
-let rec create_string (p : probabilities) (seed : int) (curr_count : int)
+let rec create_string (p : probabilities) (curr_count : int)
   : (int stack_action list * int)
   =
-  let _ = Random.init seed in
   let aggregate = p.terminal + p.nest + p.concat in
   let choice = Random.int aggregate in
   if (choice <= p.terminal) then
+    (* let _ = print_endline "rule 1 chosen" in *)
     (* 1. s = () *)
     (* terminal case - open + close *)
     ([Push (curr_count); Pop(curr_count)], curr_count)
   else
   if (choice <= (p.terminal + p.nest)) then
+    (* let _ = print_endline "rule 2 chosen" in *)
     (* 2. s = (s1) *)
     (* we recurse once and put the current one in the beginning & the end *)
-    let change = p.nest/5 in
+    let change = int_of_float @@ (float_of_int p.nest) *. nest_factor in
     let new_probabilities =
       {
         terminal = p.terminal + change;
@@ -39,12 +44,13 @@ let rec create_string (p : probabilities) (seed : int) (curr_count : int)
         concat = p.concat
       }
     in
-    let (inside, new_count) = create_string new_probabilities seed curr_count in
+    let (inside, new_count) = create_string new_probabilities curr_count in
     ([Push (new_count + 1)] @ inside @ [Pop (new_count + 1)], new_count + 1)
   else
+    (* let _ = print_endline "rule 3 chosen" in *)
     (* 3. s = s1 s2 *)
+    let change = int_of_float @@ (float_of_int p.nest) *. concat_factor in
     (* We recurse twice and concat the results *)
-    let change = p.concat/3 in
     let new_probabilities =
       {
         terminal = p.terminal + change;
@@ -52,8 +58,8 @@ let rec create_string (p : probabilities) (seed : int) (curr_count : int)
         concat = p.concat - change
       }
     in
-    let (s1, new_count1) = create_string new_probabilities seed curr_count in
-    let (s2, new_count2) = create_string new_probabilities seed new_count1 in
+    let (s1, new_count1) = create_string new_probabilities curr_count in
+    let (s2, new_count2) = create_string new_probabilities (new_count1 + 1) in
     (s1 @ s2, new_count2)
 ;;
 
@@ -85,10 +91,10 @@ end;;
 module Generated_test_graph =
   Graph_types.Make(Generated_test_node)(Generated_test_label);;
 
-  module Test_reachability =
-    Closure2.Make
-      (Generated_test_stack_elm)(Generated_test_stack_elm)
-      (Generated_test_graph);;
+module Test_reachability =
+  New_closure.Make
+    (Generated_test_stack_elm)(Generated_test_stack_elm)
+    (Generated_test_graph);;
 
 let add_edge_w_right_stack
     (lst : int stack_action list)
@@ -149,7 +155,6 @@ let rec create_interleaving_graph
     let new_graph = add_edge_w_left_stack lst_1 graph curr_last_node in
     create_interleaving_graph (List.tl lst_1) lst_2 new_graph (curr_last_node + 1)
   else
-    let _ = Random.self_init () in
     let choice = Random.bool () in
     if (choice) then
       (* we take the head from lst_1 *)
@@ -161,27 +166,53 @@ let rec create_interleaving_graph
       create_interleaving_graph lst_1 (List.tl lst_2) new_graph (curr_last_node + 1)
 ;;
 
-let create_interleaving_graph_wrapper (seed_1 : int) (seed_2 : int) =
-  let (string_1, _) = create_string initial_probabilities seed_1 0 in
-  print_endline "string 1 done";
-  let (string_2, _) = create_string initial_probabilities seed_2 0 in
-  print_endline "string 2 done";
+let create_interleaving_graph_wrapper () =
+  let (string_1, _) = create_string initial_probabilities 0 in
+  (* print_endline "string 1 done"; *)
+  let (string_2, _) = create_string initial_probabilities 0 in
+  (* print_endline "string 2 done"; *)
   create_interleaving_graph string_1 string_2 Generated_test_graph.empty 0
 ;;
 
-let first_generated_test =
-  "first_generated_test" >:: fun _ ->
-    let (generated_test_graph, last_node) =
-      create_interleaving_graph_wrapper 10 100
-    in
+let make_test (n : int) : test =
+  let (generated_test_graph, last_node) =
+    create_interleaving_graph_wrapper ()
+  in
+  "Test " ^ string_of_int n >:: fun _ ->
     let initial_summary = Test_reachability.create_initial_summary generated_test_graph in
     let final_summary = Test_reachability.step_to_closure initial_summary in
     let reachable = Test_reachability.reachable 0 last_node final_summary in
     assert_bool "generated_test_fail" reachable
 ;;
 
-let tests = "Generated_tests" >:::
-            [first_generated_test
+let generated_tests =
+  List.of_enum
+    (1---1000
+     |> Enum.map
+       (fun n ->
+          Random.init n;
+          make_test n
+       )
+    )
+;;
 
-            ]
+(* let first_generated_test =
+   "first_generated_test" >:: fun _ ->
+    (* let _ = Random.init  *)
+    let (generated_test_graph, last_node) =
+      create_interleaving_graph_wrapper ()
+    in
+    let initial_summary = Test_reachability.create_initial_summary generated_test_graph in
+    let final_summary = Test_reachability.step_to_closure initial_summary in
+    let reachable = Test_reachability.reachable 0 last_node final_summary in
+    assert_bool "generated_test_fail" reachable
+   ;; *)
+
+(* want to generate a list of units and then write a function converting a unit
+   to a test element (most likely following the first_generated_test)...
+   then do list.map on that
+*)
+
+let tests = "Generated_tests" >:::
+            generated_tests
 ;;

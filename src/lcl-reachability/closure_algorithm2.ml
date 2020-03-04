@@ -96,27 +96,6 @@ struct
     type t = (N.t * N.t) [@@deriving ord, show]
   end;;
 
-  (* module Node_pair_map =
-     struct
-     module M = BatMap.Make(Node_pair);;
-     include M;;
-     include Jhupllib.Pp_utils.Map_pp(M)(Node_pair);;
-     end;;
-
-     module Dstm_state_set =
-     struct
-     module S = BatSet.Make(Dstm_state);;
-     include S;;
-     include Jhupllib.Pp_utils.Set_pp(S)(Dstm_state);;
-     end;;
-
-     module Dstm_tape_val_set =
-     struct
-     module S = BatSet.Make(Dstm_tape_val);;
-     include S;;
-     include Jhupllib.Pp_utils.Set_pp(S)(Dstm_tape_val);;
-     end;; *)
-
   module Node_pair_to_Dstm_tape_val_multimap =
   struct
     module Impl = Jhupllib.Multimap.Make(Node_pair)(Dstm_tape_val);;
@@ -136,14 +115,35 @@ struct
   type grayStatus =
     | NotGray
     | MaybeGray
-  [@@deriving show];;
+  [@@deriving ord];;
+
+  let pp_grayStatus formatter gray =
+    match gray with
+    | NotGray -> Format.pp_print_string formatter "NG"
+    | MaybeGray -> Format.pp_print_string formatter "G"
+;;
+
+  type worklist_item =
+    (Reachability_graph.edge * grayStatus)[@@deriving ord, show];;
+
+  module Worklist_item =
+  struct
+    type t = worklist_item [@@deriving ord, show]
+  end;;
+
+  module Worklist_item_map =
+  struct
+    module M = BatMap.Make(Worklist_item);;
+    include M;;
+    include Jhupllib.Pp_utils.Map_pp(M)(Worklist_item);;
+  end;;
 
   type summary =
     {
       graph : Reachability_graph.t;
       (* keep original graph for feasibility purposes *)
       original_graph : G.t;
-      worklist : (Reachability_graph.edge * grayStatus) list;
+      worklist : worklist_item list;
       left_z : Node_pair_to_Dstm_tape_val_multimap.t;
       (* left_z_bad: field for spurious left_zs *)
       left_z_bad : Node_pair_to_Dstm_tape_val_multimap.t;
@@ -285,6 +285,12 @@ struct
       end
   ;;
 
+  (* let show_worklist =
+    Jhupllib.Pp_utils.pp_to_string
+    (Jhupllib.Pp_utils.pp_list Reachability_graph.pp_edge)
+  ;; *)
+
+
   (* Utility function computing `good and q \in {q1, q2}` *)
   let wouldbeMaybeGray (q : dstm_state) (status : grayStatus) : bool =
     match status with
@@ -305,7 +311,7 @@ struct
     let original_graph = s.original_graph in
     let labels_enum = G.get_labels (src, tgt) original_graph in
     let labels = List.of_enum labels_enum in
-    (* function returning true if an element is a push
+    (* function reStatusStatusturning true if an element is a push
        used to check if first condition for 1 is met.
     *)
     let is_push (og_l : G.Label.t) : bool =
@@ -461,10 +467,44 @@ struct
 
   ;;
 
+  let generate_worklist_item_map (worklist : worklist_item list)
+    : unit
+    =
+    let new_map =
+    List.fold_left (fun map -> fun item ->
+        let curr_num =
+        if (Worklist_item_map.mem item map) then
+          Worklist_item_map.find item map
+        else 0 in
+        Worklist_item_map.add item (curr_num + 1) map
+        ) Worklist_item_map.empty worklist
+    in
+    let _ = new_map in
+    ()
+    (* print_endline "";
+    print_endline @@ Jhupllib.Pp_utils.pp_to_string (Worklist_item_map.pp Format.pp_print_int) new_map *)
+  ;;
+
+  (* let show_worklist (wl: (Reachability_graph.edge * grayStatus) list)
+     =
+     let edges = List.map
+         (fun (e, _) -> e) wl
+     in
+     show_edge_list edges
+;; *)
+
   let step (curr_summary : summary) : summary option =
     (* NOTE: For debugging purposes *)
+    (* print_endline "";
+    print_endline @@ string_of_int (List.length curr_summary.worklist); *)
     (* print_endline "" ;
        print_endline @@ show_summary curr_summary ; *)
+    (* let _ = show_edges_from_worklist in *)
+    (* print_endline "";
+    print_endline @@ (Jhupllib.Pp_utils.pp_to_string @@ Jhupllib.Pp_utils.pp_list pp_worklist_item) curr_summary.worklist; *)
+    (* print_endline "";
+       print_endline @@ Reachability_graph.show curr_summary.graph; *)
+    let _ = generate_worklist_item_map curr_summary.worklist in
     let curr_graph = curr_summary.graph in
     let curr_worklist = curr_summary.worklist in
     match curr_worklist with
@@ -547,7 +587,9 @@ struct
                             else (new_edge, NotGray)
                           in
                           let result_worklist =
-                            List.append acc_summ.worklist [new_item_on_worklist]
+                            if (not (Reachability_graph.contains_edge new_edge acc_summ.graph))
+                            then List.append acc_summ.worklist [new_item_on_worklist]
+                            else acc_summ.worklist
                           in
                           (* check if feasible, tgt and tgt' because we are
                              checking the outgoing edge in the original graph *)
@@ -627,7 +669,11 @@ struct
                                 else (new_edge, NotGray)
                               in
                               let result_worklist =
-                                List.append acc_summ.worklist [new_item_on_worklist]
+                                if (not (Reachability_graph.contains_edge new_edge acc_summ.graph))
+                                then
+                                  List.append acc_summ.worklist [new_item_on_worklist]
+                                else
+                                  acc_summ.worklist
                               in
                               { acc_summ with
                                 graph = new_summ_graph;
@@ -659,8 +705,8 @@ struct
                (
                  (* Adding q to R(src', tgt) *)
                  let summary_q_added =
-                   { curr_sum with right_q =
-                                     Node_pair_to_Dstm_state_multimap.add (src', tgt) q curr_sum.right_q
+                   { curr_sum with
+                     right_q = Node_pair_to_Dstm_state_multimap.add (src', tgt) q curr_sum.right_q
                    }
                  in
                  let curr_left_z_bad_mapping =
@@ -689,7 +735,10 @@ struct
                               acc_summ.graph
                           in
                           let new_worklist =
+                            (* if (not (Reachability_graph.contains_edge new_edge acc_summ.graph))
+                            then *)
                             List.append acc_summ.worklist [(new_edge, NotGray)]
+                            (* else acc_summ.worklist *)
                           in
                           {acc_summ with
                            graph = new_summ_graph;
@@ -748,7 +797,6 @@ struct
                               else
                                 {acc_summ with graph = new_summ_graph}
                             | _ ->
-                              (* FIXME: this is gross and i probably shouldn't use match in the first place *)
                               if (not (Reachability_graph.contains_edge new_edge acc_summ.graph))
                               then
                                 {acc_summ with

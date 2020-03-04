@@ -10,6 +10,7 @@
     oUnit
     ppx_deriving_yojson.runtime
     lcl_reachability
+    lcl_reachability.test_lib
   )
   (preprocess
     (pps

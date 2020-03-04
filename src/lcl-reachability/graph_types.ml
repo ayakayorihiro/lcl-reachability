@@ -23,7 +23,7 @@ sig
       source : Node.t
     ; target : Node.t
     ; label : Label.t
-    } [@@deriving eq, show]
+    } [@@deriving ord, eq, show]
   ;;
 
   (* Edge functions... Why is merlin unhappy w edge *)
@@ -64,27 +64,6 @@ struct
     include Jhupllib.Pp_utils.Set_pp(S)(Node);;
   end;;
 
-  (* module Label_set =
-  struct
-    module S = BatSet.Make(Label);;
-    include S;;
-    include Jhupllib.Pp_utils.Set_pp(S)(Label);;
-  end;;
-
-  module NL_set =
-  struct
-    module S = BatSet.Make(Node_Label_pair);;
-    include S;;
-    include Jhupllib.Pp_utils.Set_pp(S)(Node_Label_pair);;
-  end;;
-
-  module Node_Node_pair_map =
-  struct
-    module M = BatMap.Make(Node_Node_pair);;
-    include M;;
-    include Jhupllib.Pp_utils.Map_pp(M)(Node_Node_pair);;
-  end;; *)
-
   module Node_map =
   struct
     module M = BatMap.Make(Node);;
@@ -106,16 +85,27 @@ struct
     include Jhupllib.Multimap_pp.Make(Impl)(Node_pair)(Label);;
   end;;
 
-  (* TODO: add multimap routines as functions
-    * use Node_map.Exceptionless.find
-  *)
   type edge =
     {
       source : Node.t
     ; target : Node.t
     ; label : Label.t
-    } [@@deriving eq, show]
+    } [@@deriving ord, eq]
   ;;
+
+  let _ = compare_edge;;
+
+  let pp_edge formatter edge =
+    let src_str = Jhupllib.Pp_utils.pp_to_string N.pp edge.source in
+    let tgt_str = Jhupllib.Pp_utils.pp_to_string N.pp edge.target in
+    let lbl_str = Jhupllib.Pp_utils.pp_to_string L.pp edge.label in
+    let str = "{" ^ src_str ^ " ⟶  " ^ tgt_str ^ "; " ^ lbl_str ^"}" in
+    Format.pp_print_string formatter str
+  ;;
+
+  let show_edge edge =
+    Jhupllib.Pp_utils.pp_to_string pp_edge edge
+;;
 
   type t =
     { outgoing_map : Node_NL_set_multimap.t ;
@@ -206,16 +196,6 @@ struct
   let get_all_edges (graph : t) : edge Enum.t =
     let edge_map = graph.outgoing_map in
     let n_nl_multimap_enum = Node_NL_set_multimap.enum edge_map in
-    (* At this point, we have an enum *)
-    (* let n_nl_enum =
-      Enum.map (fun (k, nl_set) ->
-          let new_snd = NL_set.enum nl_set in
-          Enum.map
-            (fun nl -> (k, nl)) new_snd
-        )
-        n_nl_set_enum
-      |> Enum.concat
-    in *)
     (* At this point, we have an enum (k, (n, l)) *)
     Enum.map
       (fun (src, (tgt, lbl)) ->
@@ -231,9 +211,7 @@ struct
   let get_outgoing_neighbors (src : Node.t) (graph : t) :
     (Node.t * Label.t) Enum.t =
     Node_NL_set_multimap.find src graph.outgoing_map
-    (* let outgoing_edge_set = Node_map.find_default NL_set.empty src graph.outgoing_map
-    in
-    NL_set.elements outgoing_edge_set *)
+
   ;;
 
   let get_incoming_neighbors (tgt : Node.t) (graph : t) :
