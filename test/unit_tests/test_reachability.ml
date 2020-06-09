@@ -56,7 +56,7 @@ module Test_reachability_1 =
     (Test_graph);;
 
 module Test_reachability =
-  Closure2.Make
+  New_closure.Make
     (Test_stack_elm_1)(Test_stack_elm_2)
     (Test_graph);;
 

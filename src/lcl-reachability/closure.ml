@@ -51,7 +51,7 @@ struct
   module RightGrammar = RG
   module G = G (* User-inputted graph *)
 
-  let _pp_grammar formatter choice =
+  let _pp_grammar formatter (choice : ('a, 'b) choice) =
     match choice with
     | Left(x) ->
       Format.pp_print_string formatter "⦇" ;

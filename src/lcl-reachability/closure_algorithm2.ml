@@ -23,7 +23,7 @@ struct
   module G = G (* User-inputted graph *)
 
   (* Pretty-printing for differentiating between grammars *)
-  let _pp_grammar formatter choice =
+  let _pp_grammar formatter (choice : ('a, 'b) choice) =
     match choice with
     | Left(x) ->
       Format.pp_print_string formatter "⦇" ;

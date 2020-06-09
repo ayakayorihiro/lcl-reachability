@@ -6,8 +6,10 @@ Random.init 15;;
 
 let all_tests =
   [
-    Lcl_reachability_tests.Generate_tests.tests;
-    Test_reachability.tests;
+    (* Lcl_reachability_tests.Generate_tests.tests; *)
+    (* Lcl_reachability_tests.Generate_tests_three_stack.tests *)
+    (* Test_reachability.tests; *)
+    Test_three_stack_reachability.tests
     (* Test_reachability_primes.tests *)
   ];;
 

@@ -1,16 +1,96 @@
+open Jhupllib.Logger_utils;;
+
 (* open OUnit2;; *)
-open Lcl_reachability_tests;;
-(* open Lcl_reachability.Stack_utils;; *)
+(* open Lcl_reachability_tests;; *)
+open Lcl_reachability.Stack_utils;;
+(* open Lcl_reachability.Utils;; *)
 
 module Closure = Lcl_reachability.Closure;;
 module Closure2 = Lcl_reachability.Closure_algorithm2;;
 module New_closure = Lcl_reachability.New_closure;;
+module Three_stack_reachability = Lcl_reachability.Three_stack_reachability;;
 module Graph_types = Lcl_reachability.Graph_types;;
+
+set_default_logging_level `trace;;
+
+
+module Test_node =
+struct
+  type t = string
+  let equal = (==)
+  let compare = compare
+  let pp fmt s = Format.pp_print_string fmt s
+  let show s = s
+end;;
+
+module Test_stack_elm_1 =
+struct
+  type t = int
+  (* type alphabet = int  *)
+  let equal = (==)
+  let compare = compare
+  let pp = Format.pp_print_int
+  let show = string_of_int
+end;;
+
+module Test_stack_elm_2 =
+struct
+  type t = int
+  (* let alphabet = [1;2;3;4;5] *)
+  let equal = (==)
+  let compare = compare
+  let pp = Format.pp_print_int
+  let show = string_of_int
+end;;
+
+(* NOTE: Uncomment below for two stack testing *)
+(* module Test_label =
+struct
+  type t = ((Test_stack_elm_1.t, Test_stack_elm_2.t) choice) stack_action
+  [@@deriving eq, ord, show]
+end;;
+module Test_graph = Graph_types.Make(Test_node)(Test_label);;
 
 module Test_reachability =
   New_closure.Make
-    (Generate_tests.Generated_test_stack_elm)(Generate_tests.Generated_test_stack_elm)
-    (Generate_tests.Generated_test_graph);;
+    (Test_stack_elm_1)(Test_stack_elm_2)
+    (Test_graph);; *)
+
+(* NOTE: Test_label and Test_graph for three stack testing *)
+module Test_label =
+struct
+  type t = ((Test_stack_elm_1.t, Test_stack_elm_1.t, Test_stack_elm_1.t) three_stack) stack_action
+  [@@deriving eq, ord, show]
+end;;
+
+module Test_graph = Graph_types.Make(Test_node)(Test_label);;
+
+module Test_three_stack_reachability =
+  Three_stack_reachability.Make
+    (Test_stack_elm_1)(Test_stack_elm_1)(Test_stack_elm_1)
+    (Test_graph);;
+
+
+let test_graph =
+  Test_graph.empty
+  |> Test_graph.insert_edge
+    {source = "start"; target = "start"; label = Push(StackA(1))}
+  |> Test_graph.insert_edge
+    {source = "start"; target = "start"; label = Pop(StackA(1))}
+;;
+
+(* NOTE: Uncomment below for two stack testing *)
+(* let initial_summary = Test_reachability.create_initial_summary test_graph;;
+let final_summary = Test_reachability.step_to_closure initial_summary;;
+let reachable = Test_reachability.reachable "a" "c" final_summary;;
+print_endline "=====================";;
+   print_endline (string_of_bool reachable);; *)
+
+   let initial_summary = Test_three_stack_reachability.create_initial_summary test_graph;;
+   let final_summary = Test_three_stack_reachability.step_to_closure initial_summary;;
+let reachable = Test_three_stack_reachability.reachable "start" "start" final_summary;;
+   print_endline "=====================";;
+   print_endline (string_of_bool reachable);;
 
 (* let test_graph =
   Generate_tests.Generated_test_graph.empty
@@ -88,7 +168,7 @@ module Test_reachability =
     {source = 35; target = 36; label = Pop(Left(10))}
 ;; *)
 
-
+(*
 Random.init 8;;
 
 let (generated_test_graph, last_node) =
@@ -103,12 +183,13 @@ let reachable = Test_reachability.reachable 0 last_node final_summary in
 (* assert_bool "generated_test_fail" reachable *)
 print_endline @@ string_of_bool reachable
 ;;
+*)
 
 (* want to generate a list of units and then write a function converting a unit
    to a test element (most likely following the first_generated_test)...
    then do list.map on that
-*)
 
+*)
 (* let tests = "Generated_tests" >:::
             [first_generated_test
             ]

@@ -14,6 +14,13 @@ type ('a, 'b) choice =
 [@@deriving eq, ord, show]
 ;;
 
+type ('a,'b,'c) three_stack =
+  | StackA of 'a
+  | StackB of 'b
+  | StackC of 'c
+[@@deriving eq, ord, show]
+;;
+
 type ('a) stack_action =
   | Push of 'a
   | Pop of 'a

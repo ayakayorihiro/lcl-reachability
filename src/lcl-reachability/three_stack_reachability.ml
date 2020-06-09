@@ -1,59 +1,98 @@
 open Batteries;;
 
-open Closure;;
 open Graph_types;;
 open Jhupllib.Logger_utils;;
 open Jhupllib.Nondeterminism;;
 open Stack_utils;;
 open Utils;;
 
-let logger = make_lazy_logger "New_closure";;
+let logger = make_lazy_logger "Three_stack_reachability";;
 
-(** Functor - takes in graph type, and creates module for
-    dealing with specific graph and reachability question.
-*)
+(* Data type for module for constructing graph and computing the reachability
+   question for a three-stack. *)
+module type ThreeStackReachability =
+sig
+  (* The left grammar is the one that *needs* to be  *)
+  module StackA : Stack_grammar
+  module StackB : Stack_grammar
+  module StackC : Stack_grammar
+  module G : Graph
+    with type Label.t = ((StackA.t, StackB.t, StackC.t) three_stack) stack_action
+
+  (* Summary of three-stack graph *)
+  type summary
+
+  val create_initial_summary : G.t -> summary
+
+  val step : summary -> summary option
+
+  val step_to_closure : summary -> summary
+
+  val reachable : G.Node.t -> G.Node.t -> summary -> bool
+
+  val get_reachable_nodes : G.Node.t -> summary -> G.Node.t Enum.t
+
+end;;
+
 module Make
-    (LG : Stack_grammar)
-    (RG : Stack_grammar)
+    (A : Stack_grammar)
+    (B : Stack_grammar)
+    (C : Stack_grammar)
     (G : Graph
-     with type Label.t = ((LG.t, RG.t) choice) stack_action)
-  : Reachability
-    with module LeftGrammar = LG
-     and module RightGrammar = RG
+     with type Label.t = ((A.t, B.t, C.t) three_stack) stack_action)
+  : ThreeStackReachability
+    with module StackA = A
+     and module StackB = B
+     and module StackC = C
      and module G = G
 =
 struct
-  module LeftGrammar = LG
-  module RightGrammar = RG
-  module G = G (* User-inputted graph *)
+  module StackA = A
+  module StackB = B
+  module StackC = C
+  module G = G (* User graph *)
 
   (* Pretty-printing for differentiating between grammars *)
-  let _pp_grammar formatter (choice : ('a, 'b) choice) =
+  let _pp_grammar formatter (c : ('a, 'b, 'c) three_stack) =
+    match c with
+    | StackA(x) ->
+      Format.pp_print_string formatter "ɣ" ;
+      A.pp formatter x
+    | StackB(x) ->
+      Format.pp_print_string formatter "ψ";
+      B.pp formatter x
+    | StackC(x) ->
+      Format.pp_print_string formatter "θ" ;
+      C.pp formatter x
+
+  (* Pretty-printing for differentiating between grammars *)
+  let _pp_grammar2 formatter (choice : ('a, 'b) choice) =
     match choice with
     | Left(x) ->
       Format.pp_print_string formatter "⦇" ;
-      LG.pp formatter x
+      B.pp formatter x
     | Right(x) ->
       Format.pp_print_string formatter "⟦" ;
-      RG.pp formatter x
+      C.pp formatter x
 
   type dstm_state =
-    | Incomplete (* q1 *)
-    | LookingFor of ((LG.t, RG.t) choice) (* symbol *)
-    | IncompleteLookingFor of ((LG.t, RG.t) choice) (* q1 plus symbol *)
-    | Complete (* q2 *)
+    | Incomplete (* B *)
+    | LookingFor of ((A.t, B.t, C.t) three_stack) (* ɣ, ψ, or θ *)
+    | IncompleteLookingFor of ((B.t, C.t) choice) (* ψB or θB *)
+    | Complete (* G *)
   [@@deriving ord, eq]
 
   (* Pretty-printing DSTM state *)
   let pp_dstm_state formatter dstm_state =
     match dstm_state with
-    | Incomplete -> Format.pp_print_string formatter "q1"
+    | Incomplete -> Format.pp_print_string formatter "B"
     | LookingFor (x) ->
       _pp_grammar formatter x
     | IncompleteLookingFor (x) ->
-      Format.pp_print_string formatter "q1";
-      _pp_grammar formatter x
-    | Complete -> Format.pp_print_string formatter "q2"
+      _pp_grammar2 formatter x;
+      Format.pp_print_string formatter "B"
+    | Complete -> Format.pp_print_string formatter "G"
+
 
   module Dstm_state =
   struct
@@ -61,7 +100,7 @@ struct
   end;;
 
   type dstm_tape_val =
-    | TapeSymbol of ((LG.t, RG.t) choice)
+    | TapeSymbol of ((A.t, B.t, C.t) three_stack)
     | TapeHash
   [@@deriving ord, eq]
 
@@ -131,27 +170,10 @@ struct
     include Jhupllib.Multimap_pp.Make(Impl)(Node_pair)(Dstm_state);;
   end;;
 
-
-  (* type worklist_item =
-     (Reachability_graph.edge)[@@deriving ord, show];;
-
-     module Worklist_item =
-     struct
-     type t = worklist_item [@@deriving ord, show]
-     end;;
-
-     module Worklist_item_map =
-     struct
-     module M = BatMap.Make(Worklist_item);;
-     include M;;
-     include Jhupllib.Pp_utils.Map_pp(M)(Worklist_item);;
-     end;; *)
-
   type summary =
     {
       graph : Reachability_graph.t;
       worklist : Reachability_graph.edge list;
-      (* worklist : worklist_item list; *)
     } [@@deriving show];;
   let _ = pp_summary;;
 
@@ -184,101 +206,118 @@ struct
     let new_worklist =
       List.fold_left
         (fun worklist_acc -> fun new_edge ->
-           (* new_edge :: worklist_acc *)
-           (* FIXME: setting all initial edges to NonSpurious for now, but
-              definitely need to update this because there must be spurious ones?
-           *)
            List.append worklist_acc [new_edge]
         ) [] reachability_edges
     in
     (* let new_graph =
-      reachability_edges
-      |> List.fold_left
+       reachability_edges
+       |> List.fold_left
         (flip Reachability_graph.insert_edge) Reachability_graph.empty
-    in *)
+       in *)
     {
-      (* graph = new_graph; *)
       graph = Reachability_graph.empty;
       worklist = new_worklist;
     }
   ;;
 
-  (* Function that finds new symbols based on LCL rules
+  (* Function that finds new symbols based on rules described by chart
      - q : the R-value to be considered
      - z : the L-value to be considered
   *)
   let find_rule (q : dstm_state) (z : dstm_tape_val) : (dstm_state * dstm_tape_val) option =
     match q with
     | Incomplete ->
-      Some (q, z) (* rule 5 *)
+      Some (q, z) (* column C *)
     | Complete ->
       (match z with
        | TapeHash ->
-         Some (Complete, TapeHash) (* rule 6 *)
-       | TapeSymbol(_) ->
-         Some (Incomplete, z) (* rule 7 *)
+         Some (Complete, TapeHash) (* cell B2 *)
+       | TapeSymbol(s) ->
+         match s with
+         | StackA _ ->
+           Some (Incomplete, z) (* cell B3 *)
+         | _ ->
+           Some (Complete, z) (* cell B4, B5 *)
       )
-    | IncompleteLookingFor (sym) ->
+    | IncompleteLookingFor (sym) -> (* column F and H *)
       begin
         match sym with
-        | Left(q_left) ->
+        | Left (q_psi) -> (* column F - ψB *)
           (match z with
            | TapeSymbol (ts) ->
              (match ts with
-              | Left(ts_left) ->
-                if (q_left = ts_left) then (* rule 12 *)
+              | StackB (ts_psi) ->
+                if (q_psi = ts_psi) then (* cell F4 *)
                   Some (Incomplete, TapeHash)
                 else None
-              | Right _ ->
-                Some (q, z) (* rule 11 *)
+              | _ ->
+                Some (q, z) (* cell F3, F5 *)
              )
            | TapeHash ->
-             Some (q, z) (* rule 11 *)
+             Some (q, z) (* cell F2 *)
           )
-        | Right(q_right) ->
-          (* Same thing as left... *)
+        | Right(q_theta) -> (* column H - θB *)
           (match z with
            | TapeSymbol (ts) ->
              (match ts with
-              | Left (_) ->
-                Some (q, z) (* rule 16 *)
-              | Right (ts_right) ->
-                if (q_right = ts_right) then (* rule 17 *)
+              | StackC (ts_theta) ->
+                if (q_theta = ts_theta) then (* cell H5 *)
                   Some (Incomplete, TapeHash)
                 else None
+              | _ -> Some (q, z) (* cell H3, H4 *)
              )
-           | TapeHash -> Some (q, z) (* rule 16 *)
+           | TapeHash -> Some (q, z) (* cell H2 *)
           )
       end
     | LookingFor (sym) ->
       begin
         match sym with
-        | Left (q_left) ->
+        | StackA (q_gamma) -> (* column D *)
           (
             match z with
-            | TapeHash -> Some (q, z) (* rule 8 *)
+            | TapeHash -> Some (q, z) (* cell D2 *)
             | TapeSymbol (ts) ->
               (match ts with
-               | Left (ts_left) ->
-                 if (q_left = ts_left) then (* rule 10 *)
+               | StackA (ts_gamma) ->
+                 if (q_gamma = ts_gamma) then (* cell D3 *)
                    Some (Complete, TapeHash)
                  else
                    None
-               | Right (_) ->
-                 Some (IncompleteLookingFor (sym), z) (* rule 9 *)
+               | _ ->
+                 Some (LookingFor (sym), z) (* cell D4, D5 *)
               )
           )
-        | Right (q_right) ->
-          ( match z with
-            | TapeHash -> Some (q, z) (* rule 13 *)
+        | StackB (q_psi) -> (* column E *)
+          (
+            match z with
+            | TapeHash -> Some (q, z) (* cell E2 *)
             | TapeSymbol (ts) ->
               (match ts with
-               | Left (_) ->
-                 Some (IncompleteLookingFor (sym), z) (* rule 14 *)
-               | Right (ts_right) ->
-                 if (q_right = ts_right) then (* rule 15 *)
+               | StackA _ ->
+                 Some (IncompleteLookingFor (Left (q_psi)), z) (* cell E3 *)
+               | StackB (ts_psi) ->
+                 if (q_psi = ts_psi) then (* cell E4 *)
+                   Some (Complete, TapeHash)
+                 else
+                   None
+               | StackC _ ->
+                 Some (LookingFor (sym), z) (* cell E5 *)
+              )
+          )
+        | StackC (q_theta) -> (* column G *)
+          (
+            match z with
+            | TapeHash -> Some (q, z) (* cell G2 *)
+            | TapeSymbol (ts) ->
+              (match ts with
+               | StackC (ts_theta) ->
+                 if (q_theta = ts_theta) then (* cell G5 *)
                    Some (Complete, TapeHash)
                  else None
+               | StackA _ ->
+                 Some (IncompleteLookingFor (Right (q_theta)), z) (* cell G3 *)
+               | StackB _ ->
+                 Some (LookingFor (sym), z) (* cell G4 *)
               )
           )
       end
@@ -504,7 +543,7 @@ struct
      worklist =
        (List.of_enum @@ Enum.append (List.enum curr_summary.worklist) (Nondeterminism_monad.enum addition_to_worklist))}
   ;;
-  
+
   let step (curr_summary : summary) : summary option =
     (* let _ = print_endline @@ (Reachability_graph.show curr_summary.graph) in *)
     (* Get item off of worklist *)
@@ -513,8 +552,8 @@ struct
       (* If there is nothing in the worklist, we are effectively done *)
       None
     | h :: t ->
-    (* let _ = print_endline "" in
-    let _ = print_endline @@ (Reachability_graph.show_edge h) in *)
+      (* let _ = print_endline "" in
+         let _ = print_endline @@ (Reachability_graph.show_edge h) in *)
       let new_graph = Reachability_graph.insert_edge h curr_summary.graph in
       (* We take the first edge in the worklist and add it to our graph *)
       (* TODO: check w Zach about adding before or after putting it on the worklist *)
@@ -549,7 +588,15 @@ struct
 
   let reachable (src : G.Node.t) (tgt : G.Node.t) (s : summary) : bool =
     let summary_graph = s.graph in
-    let (search_label : L.t) = (Complete, TapeHash, Summary) in
+    (* We want to look for all labels that have a G q-value, instead of just
+       (G, #) ones *)
+    let src_tgt_labels = Reachability_graph.get_labels (src, tgt) summary_graph in
+    Enum.exists (fun lab ->
+        match lab with
+        | (Complete, _, _) -> true
+        | _ -> false
+    ) src_tgt_labels
+    (* let (search_label : L.t) = (Complete, TapeHash, Summary) in
     (* let _ = print_endline @@ (Reachability_graph.show summary_graph) in  *)
     let search_edge : Reachability_graph.edge =
       { source = src ;
@@ -557,7 +604,18 @@ struct
         label = search_label
       }
     in
-    Reachability_graph.contains_edge search_edge summary_graph
+    Reachability_graph.contains_edge search_edge summary_graph *)
+  ;;
+
+  let get_reachable_nodes (src : G.Node.t) (s : summary) : G.Node.t Enum.t =
+    let summary_graph = s.graph in
+    let src_outgoing_neighbors = Reachability_graph.get_outgoing_neighbors src summary_graph in
+    Enum.filter_map (fun (n, l) ->
+        match l with
+        | (Complete, _, _) -> Some n
+        | _ -> None
+      )
+      src_outgoing_neighbors
   ;;
 
 end;;
