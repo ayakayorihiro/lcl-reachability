@@ -16,7 +16,7 @@ module Make
     (LG : Stack_grammar)
     (RG : Stack_grammar)
     (G : Graph
-     with type Label.t = ((LG.t, RG.t) choice) stack_action)
+     with type Label.t = ((LG.t, RG.t) choice) stack_action_lcl)
   : Reachability
     with module LeftGrammar = LG
      and module RightGrammar = RG
@@ -156,7 +156,7 @@ struct
   let _ = pp_summary;;
 
   let create_initial_summary (input_graph : G.t) : summary =
-    (* 0. Tentative TODO: Eliminate all epsilons - close over the epsilons *)
+
     (* 1. Get all of the edges in the original graph *)
     let og_edges = G.get_all_edges input_graph in
     let reachability_edges =
@@ -504,7 +504,7 @@ struct
      worklist =
        (List.of_enum @@ Enum.append (List.enum curr_summary.worklist) (Nondeterminism_monad.enum addition_to_worklist))}
   ;;
-  
+
   let step (curr_summary : summary) : summary option =
     (* let _ = print_endline @@ (Reachability_graph.show curr_summary.graph) in *)
     (* Get item off of worklist *)

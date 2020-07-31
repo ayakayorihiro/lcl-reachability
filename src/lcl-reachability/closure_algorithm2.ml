@@ -11,7 +11,7 @@ module Make
     (LG : Stack_grammar)
     (RG : Stack_grammar)
     (G : Graph
-     with type Label.t = ((LG.t, RG.t) choice) stack_action)
+     with type Label.t = ((LG.t, RG.t) choice) stack_action_lcl)
   : Reachability
     with module LeftGrammar = LG
      and module RightGrammar = RG

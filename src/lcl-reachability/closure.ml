@@ -10,7 +10,7 @@ sig
   module LeftGrammar : Stack_grammar
   module RightGrammar : Stack_grammar
   module G : Graph
-    with type Label.t = ((LeftGrammar.t, RightGrammar.t) choice) stack_action
+    with type Label.t = ((LeftGrammar.t, RightGrammar.t) choice) stack_action_lcl
 
   (* Want to define a type for DSTM states - want to take the stack grammars from
      the graph and define states based on them *)
@@ -40,7 +40,7 @@ module Make
     (LG : Stack_grammar)
     (RG : Stack_grammar)
     (G : Graph
-     with type Label.t = ((LG.t, RG.t) choice) stack_action)
+     with type Label.t = ((LG.t, RG.t) choice) stack_action_lcl)
   : Reachability
     with module LeftGrammar = LG
      and module RightGrammar = RG
