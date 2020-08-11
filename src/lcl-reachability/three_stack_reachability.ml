@@ -735,7 +735,7 @@ struct
                | First (tse_fst) ->
                  if Predicate1.exec_pred p1 tse_fst
                  then
-                   Some ({q with dstm_operation = SearchAndReplaceStep2(First(tse_fst, p2, p3))}, z)
+                   Some ({q with dstm_operation = SearchAndReplaceStep2(First(tse_fst, p2, p3))}, TapeHash)
                  else None (* topmost stack element didn't fit the predicate, we blow up *)
                | _ -> Some (q, z)
              end
@@ -751,7 +751,7 @@ struct
                | Second (tse_snd) ->
                  if Predicate2.exec_pred p1 tse_snd
                  then
-                   Some ({q with dstm_operation = SearchAndReplaceStep2(Second(tse_snd, p2, p3))}, z)
+                   Some ({q with dstm_operation = SearchAndReplaceStep2(Second(tse_snd, p2, p3))}, TapeHash)
                  else None (* topmost stack element didn't fit the predicate, we blow up *)
                | _ -> Some (q, z)
              end
@@ -767,7 +767,7 @@ struct
                | Third (tse_thd) ->
                  if Predicate3.exec_pred p1 tse_thd
                  then
-                   Some ({q with dstm_operation = SearchAndReplaceStep2(Third(tse_thd, p2, p3))}, z)
+                   Some ({q with dstm_operation = SearchAndReplaceStep2(Third(tse_thd, p2, p3))}, TapeHash)
                  else None (* topmost stack element didn't fit the predicate, we blow up *)
                | _ -> Some (q, z)
              end
@@ -785,7 +785,7 @@ struct
                | First (tse_fst) ->
                  if Predicate1.exec_pred p1 tse_fst (* If topmost stack element fits "search" predicate *)
                  then
-                   Some ({q with dstm_operation = SearchAndReplaceStep3(First(se, p2))}, z)
+                   Some ({q with dstm_operation = SearchAndReplaceStep3(First(se, p2))}, TapeHash)
                  else None
                | _ -> Some (q, z)
              end
@@ -801,7 +801,7 @@ struct
                | Second (tse_snd) ->
                  if Predicate2.exec_pred p1 tse_snd (* If topmost stack element fits "search" predicate *)
                  then
-                   Some ({q with dstm_operation = SearchAndReplaceStep3(Second(se, p2))}, z)
+                   Some ({q with dstm_operation = SearchAndReplaceStep3(Second(se, p2))}, TapeHash)
                  else None
                | _ -> Some (q, z)
              end
@@ -817,7 +817,7 @@ struct
                | Third (tse_thd) ->
                  if Predicate3.exec_pred p1 tse_thd (* If topmost stack element fits "search" predicate *)
                  then
-                   Some ({q with dstm_operation = SearchAndReplaceStep3(Third(se, p2))}, z)
+                   Some ({q with dstm_operation = SearchAndReplaceStep3(Third(se, p2))}, TapeHash)
                  else None
                | _ -> Some (q, z)
              end
@@ -1144,6 +1144,18 @@ struct
     let v1 = e.source in
     let v3 = e.target in
     let v1_v3_label = e.label in
+    (* logger `trace (fun () -> Printf.sprintf
+                      ("\n===========================================\n" ^^
+                        "Original edge is v1->v3\n" ^^
+                       "v1 = %s\nv3 = %s\n" ^^
+                       "v1 to v3 = %s\n"
+                      )
+                      (N.show v1) (N.show v3)
+                      (L.show v1_v3_label)        );
+    logger `trace (fun () -> Printf.sprintf
+                      ("\n===========================================\n"
+                      )
+                      ); *)
     let addition_to_worklist =
       let open Nondeterminism_monad in
       (* We want v2, which are all original outgoing neighbors of v1 *)
@@ -1164,6 +1176,14 @@ struct
       (* We want to add the edge to the worklist only if the new edge isn't
          already in the summary graph *)
       [%guard (not (Reachability_graph.contains_edge new_edge curr_summary.graph))];
+      (* logger `trace (fun () -> Printf.sprintf
+                        ("v2 = %s\nv4 = %s\n" ^^
+                         "v2 to v4 = %s\n" ^^
+                         "new label = %s\n"
+                        )
+                        (N.show v2)(N.show v4)
+                        (L.show v2_v4_label)
+                        (L.show (new_q, new_z, Summary))        ); *)
       logger `trace (fun () -> Printf.sprintf
                         ("Original edge is v1->v3\n" ^^
                          "v1 = %s\nv2 = %s\nv3 = %s\nv4 = %s\n" ^^
@@ -1264,18 +1284,26 @@ struct
   ;;
 
   let reachable (src : G.Node.t) (tgt : G.Node.t) (s : summary) : bool =
+    let _ = print_endline "computing reachability" in
     let summary_graph = s.graph in
     (* We want to look for all labels that have a G q-value, instead of just
        (G, #) ones *)
     let src_tgt_labels = Reachability_graph.get_labels (src, tgt) summary_graph in
+    let _ = print_endline @@ ("No edges:") ^ (string_of_bool @@ Enum.is_empty src_tgt_labels) in
     Enum.exists (fun lab ->
+        logger `trace (fun () -> Printf.sprintf
+                          ("IN REACHABLE" ^^
+                           "label = %s"
+                          )
+                          (L.show lab));
         match lab with
         | (state, _, _) ->
           begin
             match state.dstm_operation with
             | NoOp ->
               state.dstm_complete
-            | _ -> false
+            | _ ->
+              false
           end
       ) src_tgt_labels
   ;;
@@ -1295,5 +1323,7 @@ struct
       )
       src_outgoing_neighbors
   ;;
+
+
 
 end;;

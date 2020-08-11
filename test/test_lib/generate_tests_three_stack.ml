@@ -20,7 +20,7 @@ let concat_factor = 0.8;;
 
 (* returns a list of numbers, as well as the new count *)
 let rec create_string (p : probabilities) (curr_count : int)
-  : (int stack_action list * int)
+  : (((int, unit) stack_action) list * int)
   =
   let aggregate = p.terminal + p.nest + p.concat in
   let choice = Random.int aggregate in
@@ -82,20 +82,38 @@ end;;
 
 module Generated_test_label =
 struct
-  type t = ((Generated_test_stack_elm.t, Generated_test_stack_elm.t, Generated_test_stack_elm.t) three_stack) stack_action
+  type t =
+    ((Generated_test_stack_elm.t, unit) stack_action,
+    (Generated_test_stack_elm.t, unit) stack_action,
+    (Generated_test_stack_elm.t, unit) stack_action) trinary
+  (* type t = ((Generated_test_stack_elm.t, Generated_test_stack_elm.t, Generated_test_stack_elm.t) three_stack) stack_action *)
   [@@deriving eq, ord, show]
 end;;
 
 module Generated_test_graph =
   Graph_types.Make(Generated_test_node)(Generated_test_label);;
 
+(* NOTE: super stub predicate module? *)
+module Generated_test_predicate =
+struct
+  type t = unit
+  module Grammar = Generated_test_stack_elm
+  let exec_pred () _ = true;;
+  let equal () () = true;;
+  let compare () () = 0;;
+  let show () = "generated test predicate - unit";;
+  let pp _ () = ();;
+end;;
+
 module Test_reachability =
   Closure.Make
-    (Generated_test_stack_elm)(Generated_test_stack_elm)(Generated_test_stack_elm)
+    (Generated_test_stack_elm)(Generated_test_predicate)
+    (Generated_test_stack_elm)(Generated_test_predicate)
+    (Generated_test_stack_elm)(Generated_test_predicate)
     (Generated_test_graph);;
 
 let add_edge_w_stack_a
-    (lst : int stack_action list)
+    (lst : ((int, unit) stack_action) list)
     (graph : Generated_test_graph.t)
     (curr_last_node : int)
   =
@@ -103,17 +121,17 @@ let add_edge_w_stack_a
     match List.hd lst with
     | Push n ->
       {source = curr_last_node; target = curr_last_node + 1;
-       label = Push(StackA(n))}
+       label = First(Push(n))}
     | Pop n ->
       {source = curr_last_node; target = curr_last_node + 1;
-       label = Pop(StackA(n))}
+       label = First(Pop(n))}
     | _ -> failwith "epsilon"
   in
   Generated_test_graph.insert_edge new_edge graph
 ;;
 
 let add_edge_w_stack_b
-    (lst : int stack_action list)
+    (lst : (int, unit) stack_action list)
     (graph : Generated_test_graph.t)
     (curr_last_node : int)
   =
@@ -121,17 +139,17 @@ let add_edge_w_stack_b
     match List.hd lst with
     | Push n ->
       {source = curr_last_node; target = curr_last_node + 1;
-       label = Push(StackB(n))}
+       label = Second(Push(n))}
     | Pop n ->
       {source = curr_last_node; target = curr_last_node + 1;
-       label = Pop(StackB(n))}
+       label = Second(Pop(n))}
     | _ -> failwith "epsilon"
   in
   Generated_test_graph.insert_edge new_edge graph
 ;;
 
 let add_edge_w_stack_c
-    (lst : int stack_action list)
+    (lst : (int, unit) stack_action list)
     (graph : Generated_test_graph.t)
     (curr_last_node : int)
   =
@@ -139,10 +157,10 @@ let add_edge_w_stack_c
     match List.hd lst with
     | Push n ->
       {source = curr_last_node; target = curr_last_node + 1;
-       label = Push(StackC(n))}
+       label = Third(Push(n))}
     | Pop n ->
       {source = curr_last_node; target = curr_last_node + 1;
-       label = Pop(StackC(n))}
+       label = Third(Pop(n))}
     | _ -> failwith "epsilon"
   in
   Generated_test_graph.insert_edge new_edge graph
@@ -150,10 +168,10 @@ let add_edge_w_stack_c
 
 (* Function creating single interleaving graph *)
 let rec create_interleaving_two_graph
-    (lst_1 : int stack_action list)
-    (lst_1_fun : int stack_action list -> Generated_test_graph.t -> int -> Generated_test_graph.t)
-    (lst_2 : int stack_action list)
-    (lst_2_fun : int stack_action list -> Generated_test_graph.t -> int -> Generated_test_graph.t)
+    (lst_1 : (int, unit) stack_action list)
+    (lst_1_fun : (int, unit) stack_action list -> Generated_test_graph.t -> int -> Generated_test_graph.t)
+    (lst_2 : (int, unit) stack_action list)
+    (lst_2_fun : (int, unit) stack_action list -> Generated_test_graph.t -> int -> Generated_test_graph.t)
     (graph : Generated_test_graph.t)
     (curr_last_node : int)
   : (Generated_test_graph.t * int)
@@ -185,9 +203,9 @@ let rec create_interleaving_two_graph
 
 (* Function creating single interleaving graph *)
 let rec create_interleaving_three_graph
-    (lst_1 : int stack_action list)
-    (lst_2 : int stack_action list)
-    (lst_3 : int stack_action list)
+    (lst_1 : (int, unit) stack_action list)
+    (lst_2 : (int, unit) stack_action list)
+    (lst_3 : (int, unit) stack_action list)
     (graph : Generated_test_graph.t)
     (curr_last_node : int)
   : (Generated_test_graph.t * int)

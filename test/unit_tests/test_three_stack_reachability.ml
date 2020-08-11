@@ -30,6 +30,56 @@ struct
   let show = string_of_int
 end;;
 
+module Test_stack_predicate_1 =
+struct
+  type t =
+    | Negative
+    | Search
+    | Replace
+  ;;
+  module Grammar = Test_stack_elm_1
+  let exec_pred (pred : t) (x : Grammar.t) =
+    match pred with
+    | Negative ->
+      (x < 0)
+    | Search -> x = 1000
+    | Replace -> x = 2000
+  ;;
+  let equal p1 p2 = p1 = p2;;
+  let compare p1 p2 =
+    match p1 with
+    | Negative ->
+      begin
+        match p2 with
+        | Negative -> 0
+        | Search -> -1
+        | Replace -> -2
+      end
+    | Search ->
+      begin
+        match p2 with
+        | Negative -> 1
+        | Search -> 0
+        | Replace -> -1
+      end
+    | Replace ->
+      begin
+        match p2 with
+        | Negative -> 2
+        | Search -> 1
+        | Replace -> 0
+      end
+  let show p =
+    match p with
+    | Negative -> "Negative"
+    | Search -> "Search"
+    | Replace -> "Replace"
+  ;;
+  let pp formatter p =
+    Format.pp_print_string formatter (show p)
+  ;;
+end;;
+
 module Test_stack_elm_2 =
 struct
   type t = int
@@ -38,6 +88,18 @@ struct
   let compare = compare
   let pp = Format.pp_print_int
   let show = string_of_int
+end;;
+
+module Test_stack_predicate_2 : StackElementPredicates with module Grammar = Test_stack_elm_2
+=
+struct
+  type t = ..;; (* FIXME: what is ..*)
+  module Grammar = Test_stack_elm_2;;
+  let exec_pred _ _ = false;;  (* dummy code which will never be executed *)
+  let equal _ _ = false;;
+  let compare _ _ = -1;;
+  let show _ = "stack pred 2";;
+  let pp _ _ = ();;
 end;;
 
 module Test_stack_elm_3 =
@@ -50,9 +112,25 @@ struct
   let show = string_of_int
 end;;
 
+module Test_stack_predicate_3 : StackElementPredicates with module Grammar = Test_stack_elm_3
+=
+struct
+  type t = ..;; (* FIXME: what is ..*)
+  module Grammar = Test_stack_elm_3;;
+  let exec_pred _ _ = false;;  (* dummy code which will never be executed *)
+  let equal _ _ = false;;
+  let compare _ _ = -1;;
+  let show _ = "stack pred 2";;
+  let pp _ _ = ();;
+end;;
+
+
 module Test_label =
 struct
-  type t = ((Test_stack_elm_1.t, Test_stack_elm_2.t, Test_stack_elm_3.t) three_stack) stack_action
+  type t =
+    (((Test_stack_elm_1.t, Test_stack_predicate_1.t) stack_action),
+     ((Test_stack_elm_2.t, Test_stack_predicate_2.t) stack_action),
+     ((Test_stack_elm_3.t, Test_stack_predicate_3.t) stack_action)) trinary
   [@@deriving eq, ord, show]
 end;;
 
@@ -60,7 +138,9 @@ module Test_graph = Graph_types.Make(Test_node)(Test_label);;
 
 module Test_reachability =
   Reachability.Make
-    (Test_stack_elm_1)(Test_stack_elm_2)(Test_stack_elm_3)
+    (Test_stack_elm_1)(Test_stack_predicate_1)
+    (Test_stack_elm_2)(Test_stack_predicate_2)
+    (Test_stack_elm_3)(Test_stack_predicate_3)
     (Test_graph);;
 
 let single_reachability_test =
@@ -69,9 +149,9 @@ let single_reachability_test =
     let test =
       Test_graph.empty
       |> insert_edge
-        {source = "a"; target = "b"; label = Push(StackA(1))}
+        {source = "a"; target = "b"; label = First(Push(1))}
       |> insert_edge
-        {source = "b"; target = "c"; label = Pop(StackA(1))}
+        {source = "b"; target = "c"; label = First(Pop(1))}
     in
     let initial_summary = Test_reachability.create_initial_summary test in
     let final_summary = Test_reachability.step_to_closure initial_summary in
@@ -84,13 +164,13 @@ let simple_double_reachability_test =
     let test =
       Test_graph.empty
       |> Test_graph.insert_edge
-        {source = "a"; target = "b"; label = Push(StackA(1))}
+        {source = "a"; target = "b"; label = First(Push(1))}
       |> Test_graph.insert_edge
-        {source = "b"; target = "c"; label = Pop(StackA(1))}
+        {source = "b"; target = "c"; label = First(Pop(1))}
       |> Test_graph.insert_edge
-        {source = "c"; target = "d"; label = Push(StackB(2))}
+        {source = "c"; target = "d"; label = Second(Push(2))}
       |> Test_graph.insert_edge
-        {source = "d"; target = "e"; label = Pop(StackB(2))}
+        {source = "d"; target = "e"; label = Second(Pop(2))}
     in
     let initial_summary = Test_reachability.create_initial_summary test in
     let final_summary = Test_reachability.step_to_closure initial_summary in
@@ -103,13 +183,13 @@ let crossing_double_reachability_test =
     let test =
       Test_graph.empty
       |> Test_graph.insert_edge
-        {source = "u"; target = "x"; label = Push(StackA(1))}
+        {source = "u"; target = "x"; label = First(Push(1))}
       |> Test_graph.insert_edge
-        {source = "x"; target = "w"; label = Push(StackB(2))}
+        {source = "x"; target = "w"; label = Second(Push(2))}
       |> Test_graph.insert_edge
-        {source = "w"; target = "y"; label = Pop(StackA(1))}
+        {source = "w"; target = "y"; label = First(Pop(1))}
       |> Test_graph.insert_edge
-        {source = "y"; target = "v"; label = Pop(StackB(2))}
+        {source = "y"; target = "v"; label = Second(Pop(2))}
     in
     let initial_summary = Test_reachability.create_initial_summary test in
     let final_summary = Test_reachability.step_to_closure initial_summary in
@@ -122,17 +202,17 @@ let crossing_triple_reachability_test =
     let test =
       Test_graph.empty
       |> Test_graph.insert_edge
-        {source = "a"; target = "b"; label = Push(StackA(1))}
+        {source = "a"; target = "b"; label = First(Push(1))}
       |> Test_graph.insert_edge
-        {source = "b"; target = "c"; label = Push(StackB(2))}
+        {source = "b"; target = "c"; label = Second(Push(2))}
       |> Test_graph.insert_edge
-        {source = "c"; target = "d"; label = Push(StackC(3))}
+        {source = "c"; target = "d"; label = Third(Push(3))}
       |> Test_graph.insert_edge
-        {source = "d"; target = "e"; label = Pop(StackB(2))}
+        {source = "d"; target = "e"; label = Second(Pop(2))}
       |> Test_graph.insert_edge
-        {source = "e"; target = "f"; label = Pop(StackC(3))}
+        {source = "e"; target = "f"; label = Third(Pop(3))}
       |> Test_graph.insert_edge
-        {source = "f"; target = "g"; label = Pop(StackA(1))}
+        {source = "f"; target = "g"; label = First(Pop(1))}
     in
     let initial_summary = Test_reachability.create_initial_summary test in
     let final_summary = Test_reachability.step_to_closure initial_summary in
@@ -145,13 +225,13 @@ let only_stack_a_good_simple_test =
     let test =
       Test_graph.empty
       |> Test_graph.insert_edge
-        {source = "a"; target = "b"; label = Push(StackA(100))}
+        {source = "a"; target = "b"; label = First(Push(100))}
       (* |> Test_graph.insert_edge
          {source = "b"; target = "c"; label = Pop(StackC(2))} *)
       |> Test_graph.insert_edge
-        {source = "b"; target = "c"; label = Push(StackB(100))}
+        {source = "b"; target = "c"; label = Second(Push(100))}
       |> Test_graph.insert_edge
-        {source = "c"; target = "d"; label = Pop(StackA(100))}
+        {source = "c"; target = "d"; label = First(Pop(100))}
     in
     let initial_summary = Test_reachability.create_initial_summary test in
     let final_summary = Test_reachability.step_to_closure initial_summary in
@@ -164,11 +244,11 @@ let only_stack_a_good_simple_test_outer =
     let test =
       Test_graph.empty
       |> Test_graph.insert_edge
-        {source = "a"; target = "b"; label = Push(StackB(100))}
+        {source = "a"; target = "b"; label = Second(Push(100))}
       |> Test_graph.insert_edge
-        {source = "b"; target = "c"; label = Push(StackA(100))}
+        {source = "b"; target = "c"; label = First(Push(100))}
       |> Test_graph.insert_edge
-        {source = "c"; target = "d"; label = Pop(StackA(100))}
+        {source = "c"; target = "d"; label = First(Pop(100))}
     in
     let initial_summary = Test_reachability.create_initial_summary test in
     let final_summary = Test_reachability.step_to_closure initial_summary in
@@ -181,13 +261,13 @@ let only_stack_a_good_simple_test_2 =
     let test =
       Test_graph.empty
       |> Test_graph.insert_edge
-        {source = "start"; target = "b"; label = Push(StackA(100))}
+        {source = "start"; target = "b"; label = First(Push(100))}
       |> Test_graph.insert_edge
-        {source = "b"; target = "c"; label = Push(StackB(100))}
+        {source = "b"; target = "c"; label = Second(Push(100))}
       |> Test_graph.insert_edge
-        {source = "c"; target = "d"; label = Pop(StackC(100))}
+        {source = "c"; target = "d"; label = Third(Pop(100))}
       |> Test_graph.insert_edge
-        {source = "d"; target = "end"; label = Pop(StackA(100))}
+        {source = "d"; target = "end"; label = First(Pop(100))}
     in
     let initial_summary = Test_reachability.create_initial_summary test in
     let final_summary = Test_reachability.step_to_closure initial_summary in
@@ -200,13 +280,13 @@ let only_stack_a_good_simple_test_3 =
     let test =
       Test_graph.empty
       |> Test_graph.insert_edge
-        {source = "start"; target = "b"; label = Push(StackB(100))}
+        {source = "start"; target = "b"; label = Second(Push(100))}
       |> Test_graph.insert_edge
-        {source = "b"; target = "c"; label = Pop(StackC(100))}
+        {source = "b"; target = "c"; label = Third(Pop(100))}
       |> Test_graph.insert_edge
-        {source = "c"; target = "d"; label = Push(StackA(100))}
+        {source = "c"; target = "d"; label = First(Push(100))}
       |> Test_graph.insert_edge
-        {source = "d"; target = "end"; label = Pop(StackA(100))}
+        {source = "d"; target = "end"; label = First(Pop(100))}
     in
     let initial_summary = Test_reachability.create_initial_summary test in
     let final_summary = Test_reachability.step_to_closure initial_summary in
@@ -219,13 +299,13 @@ let only_stack_b_good_simple_test_2 =
     let test =
       Test_graph.empty
       |> Test_graph.insert_edge
-        {source = "start"; target = "b"; label = Push(StackB(100))}
+        {source = "start"; target = "b"; label = Second(Push(100))}
       |> Test_graph.insert_edge
-        {source = "b"; target = "c"; label = Push(StackA(100))}
+        {source = "b"; target = "c"; label = First(Push(100))}
       |> Test_graph.insert_edge
-        {source = "c"; target = "d"; label = Pop(StackC(100))}
+        {source = "c"; target = "d"; label = Third(Pop(100))}
       |> Test_graph.insert_edge
-        {source = "d"; target = "end"; label = Pop(StackB(100))}
+        {source = "d"; target = "end"; label = Second(Pop(100))}
     in
     let initial_summary = Test_reachability.create_initial_summary test in
     let final_summary = Test_reachability.step_to_closure initial_summary in
@@ -238,13 +318,13 @@ let embedded_double_reachability_test =
     let test =
       Test_graph.empty
       |> Test_graph.insert_edge
-        {source = "a"; target = "b"; label = Push(StackA(1))}
+        {source = "a"; target = "b"; label = First(Push(1))}
       |> Test_graph.insert_edge
-        {source = "b"; target = "c"; label = Push(StackB(2))}
+        {source = "b"; target = "c"; label = Second(Push(2))}
       |> Test_graph.insert_edge
-        {source = "c"; target = "d"; label = Pop(StackB(2))}
+        {source = "c"; target = "d"; label = Second(Pop(2))}
       |> Test_graph.insert_edge
-        {source = "d"; target = "e"; label = Pop(StackA(1))}
+        {source = "d"; target = "e"; label = First(Pop(1))}
     in
     let initial_summary = Test_reachability.create_initial_summary test in
     let final_summary = Test_reachability.step_to_closure initial_summary in
@@ -257,17 +337,17 @@ let separate_two_stack_triple_reachability_test =
     let test =
       Test_graph.empty
       |> Test_graph.insert_edge
-        {source = "a"; target = "b"; label = Push(StackA(1))}
+        {source = "a"; target = "b"; label = First(Push(1))}
       |> Test_graph.insert_edge
-        {source = "b"; target = "c"; label = Push(StackB(2))}
+        {source = "b"; target = "c"; label = Second(Push(2))}
       |> Test_graph.insert_edge
-        {source = "c"; target = "d"; label = Pop(StackB(2))}
+        {source = "c"; target = "d"; label = Second(Pop(2))}
       |> Test_graph.insert_edge
-        {source = "d"; target = "e"; label = Pop(StackA(1))}
+        {source = "d"; target = "e"; label = First(Pop(1))}
       |> Test_graph.insert_edge
-        {source = "e"; target = "f"; label = Push(StackA(3))}
+        {source = "e"; target = "f"; label = First(Push(3))}
       |> Test_graph.insert_edge
-        {source = "f"; target = "g"; label = Pop(StackA(3))}
+        {source = "f"; target = "g"; label = First(Pop(3))}
     in
     let initial_summary = Test_reachability.create_initial_summary test in
     let final_summary = Test_reachability.step_to_closure initial_summary in
@@ -280,17 +360,17 @@ let two_crossing_reachability_test =
     let test =
       Test_graph.empty
       |> Test_graph.insert_edge
-        {source = "a"; target = "b"; label = Push(StackA(1))}
+        {source = "a"; target = "b"; label = First(Push(1))}
       |> Test_graph.insert_edge
-        {source = "b"; target = "c"; label = Push(StackB(2))}
+        {source = "b"; target = "c"; label = Second(Push(2))}
       |> Test_graph.insert_edge
-        {source = "c"; target = "d"; label = Pop(StackA(1))}
+        {source = "c"; target = "d"; label = First(Pop(1))}
       |> Test_graph.insert_edge
-        {source = "d"; target = "e"; label = Push(StackA(3))}
+        {source = "d"; target = "e"; label = First(Push(3))}
       |> Test_graph.insert_edge
-        {source = "e"; target = "f"; label = Pop(StackB(2))}
+        {source = "e"; target = "f"; label = Second(Pop(2))}
       |> Test_graph.insert_edge
-        {source = "f"; target = "g"; label = Pop(StackA(3))}
+        {source = "f"; target = "g"; label = First(Pop(3))}
     in
     let initial_summary = Test_reachability.create_initial_summary test in
     let final_summary = Test_reachability.step_to_closure initial_summary in
@@ -303,9 +383,9 @@ let loop_base_case =
     let test =
       Test_graph.empty
       |> Test_graph.insert_edge
-        {source = "a"; target = "a"; label = Push(StackA(1))}
+        {source = "a"; target = "a"; label = First(Push(1))}
       |> Test_graph.insert_edge
-        {source = "a"; target = "a"; label = Pop(StackA(1))}
+        {source = "a"; target = "a"; label = First(Pop(1))}
     in
     let initial_summary = Test_reachability.create_initial_summary test in
     let final_summary = Test_reachability.step_to_closure initial_summary in
@@ -318,9 +398,9 @@ let two_node_loop_fst =
     let test =
       Test_graph.empty
       |> Test_graph.insert_edge
-        {source = "a"; target = "a"; label = Push(StackA(1))}
+        {source = "a"; target = "a"; label = First(Push(1))}
       |> Test_graph.insert_edge
-        {source = "a"; target = "b"; label = Pop(StackA(1))}
+        {source = "a"; target = "b"; label = First(Pop(1))}
     in
     let initial_summary = Test_reachability.create_initial_summary test in
     let final_summary = Test_reachability.step_to_closure initial_summary in
@@ -333,9 +413,9 @@ let two_node_loop_snd =
     let test =
       Test_graph.empty
       |> Test_graph.insert_edge
-        {source = "a"; target = "b"; label = Push(StackA(1))}
+        {source = "a"; target = "b"; label = First(Push(1))}
       |> Test_graph.insert_edge
-        {source = "b"; target = "b"; label = Pop(StackA(1))}
+        {source = "b"; target = "b"; label = First(Pop(1))}
     in
     let initial_summary = Test_reachability.create_initial_summary test in
     let final_summary = Test_reachability.step_to_closure initial_summary in
@@ -348,11 +428,11 @@ let triangle_reachable =
     let test =
       Test_graph.empty
       |> Test_graph.insert_edge
-        {source = "a"; target = "b"; label = Push(StackA(1))}
+        {source = "a"; target = "b"; label = First(Push(1))}
       |> Test_graph.insert_edge
-        {source = "b"; target = "c"; label = Pop(StackA(1))}
+        {source = "b"; target = "c"; label = First(Pop(1))}
       |> Test_graph.insert_edge
-        {source = "a"; target = "c"; label = Push(StackB(10))}
+        {source = "a"; target = "c"; label = Second(Push(10))}
     in
     let initial_summary = Test_reachability.create_initial_summary test in
     let final_summary = Test_reachability.step_to_closure initial_summary in
@@ -365,11 +445,11 @@ let triangle_reachable2 =
     let test =
       Test_graph.empty
       |> Test_graph.insert_edge
-        {source = "a"; target = "b"; label = Push(StackA(1))}
+        {source = "a"; target = "b"; label = First(Push(1))}
       |> Test_graph.insert_edge
-        {source = "b"; target = "c"; label = Pop(StackB(2))}
+        {source = "b"; target = "c"; label = Second(Pop(2))}
       |> Test_graph.insert_edge
-        {source = "a"; target = "c"; label = Pop(StackA(1))}
+        {source = "a"; target = "c"; label = First(Pop(1))}
     in
     let initial_summary = Test_reachability.create_initial_summary test in
     let final_summary = Test_reachability.step_to_closure initial_summary in
@@ -383,11 +463,11 @@ let triangle_unreachable =
     let test =
       Test_graph.empty
       |> Test_graph.insert_edge
-        {source = "a"; target = "b"; label = Push(StackC(1))}
+        {source = "a"; target = "b"; label = Third(Push(1))}
       |> Test_graph.insert_edge
-        {source = "b"; target = "c"; label = Pop(StackB(2))}
+        {source = "b"; target = "c"; label = Second(Pop(2))}
       |> Test_graph.insert_edge
-        {source = "a"; target = "c"; label = Pop(StackC(1))}
+        {source = "a"; target = "c"; label = Third(Pop(1))}
     in
     let initial_summary = Test_reachability.create_initial_summary test in
     let final_summary = Test_reachability.step_to_closure initial_summary in
@@ -400,13 +480,13 @@ let square_reachable =
     let test =
       Test_graph.empty
       |> Test_graph.insert_edge
-        {source = "a"; target = "b"; label = Push(StackA(1))}
+        {source = "a"; target = "b"; label = First(Push(1))}
       |> Test_graph.insert_edge
-        {source = "b"; target = "d"; label = Pop(StackA(1))}
+        {source = "b"; target = "d"; label = First(Pop(1))}
       |> Test_graph.insert_edge
-        {source = "a"; target = "c"; label = Push(StackB(100))}
+        {source = "a"; target = "c"; label = Second(Push(100))}
       |> Test_graph.insert_edge
-        {source = "c"; target = "d"; label = Pop(StackB(2))}
+        {source = "c"; target = "d"; label = Second(Pop(2))}
     in
     let initial_summary = Test_reachability.create_initial_summary test in
     let final_summary = Test_reachability.step_to_closure initial_summary in
@@ -423,13 +503,13 @@ let square_unreachable =
     let test =
       Test_graph.empty
       |> Test_graph.insert_edge
-        {source = "a"; target = "b"; label = Push(StackA(1))}
+        {source = "a"; target = "b"; label = First(Push(1))}
       |> Test_graph.insert_edge
-        {source = "b"; target = "d"; label = Pop(StackB(1))}
+        {source = "b"; target = "d"; label = Second(Pop(1))}
       |> Test_graph.insert_edge
-        {source = "a"; target = "c"; label = Push(StackB(1))}
+        {source = "a"; target = "c"; label = Second(Push(1))}
       |> Test_graph.insert_edge
-        {source = "c"; target = "d"; label = Pop(StackA(1))}
+        {source = "c"; target = "d"; label = First(Pop(1))}
     in
     let initial_summary = Test_reachability.create_initial_summary test in
     let final_summary = Test_reachability.step_to_closure initial_summary in
@@ -443,15 +523,15 @@ let non_square_unreachable =
     let test =
       Test_graph.empty
       |> Test_graph.insert_edge
-        {source = "a"; target = "b"; label = Push(StackA(1))}
+        {source = "a"; target = "b"; label = First(Push(1))}
       |> Test_graph.insert_edge
-        {source = "b"; target = "e"; label = Pop(StackB(1))}
+        {source = "b"; target = "e"; label = Second(Pop(1))}
       |> Test_graph.insert_edge
-        {source = "e"; target = "d"; label = Pop(StackB(100))}
+        {source = "e"; target = "d"; label = Second(Pop(100))}
       |> Test_graph.insert_edge
-        {source = "a"; target = "c"; label = Push(StackB(1))}
+        {source = "a"; target = "c"; label = Second(Push(1))}
       |> Test_graph.insert_edge
-        {source = "c"; target = "d"; label = Pop(StackA(1))}
+        {source = "c"; target = "d"; label = First(Pop(1))}
     in
     let initial_summary = Test_reachability.create_initial_summary test in
     let final_summary = Test_reachability.step_to_closure initial_summary in
@@ -459,6 +539,158 @@ let non_square_unreachable =
     assert (reachable)
 ;;
 
+let simple_peek_eq_test =
+  "simple_peek_eq_test" >:: fun _ ->
+    let test =
+      Test_graph.empty
+      |> Test_graph.insert_edge
+        {source = "start"; target = "a"; label = First(Push(1))}
+      |> Test_graph.insert_edge
+        {source = "a"; target = "end"; label = First(PeekEq(1))}
+    in
+    let initial_summary = Test_reachability.create_initial_summary test in
+    let final_summary = Test_reachability.step_to_closure initial_summary in
+    let reachable = Test_reachability.reachable "start" "end" final_summary in
+    assert reachable
+;;
+
+let simple_peek_eq_test_fail =
+  "simple_peek_eq_test_fail" >:: fun _ ->
+    let test =
+      Test_graph.empty
+      |> Test_graph.insert_edge
+        {source = "start"; target = "a"; label = First(Push(1))}
+      |> Test_graph.insert_edge
+        {source = "a"; target = "end"; label = First(PeekEq(10))}
+    in
+    let initial_summary = Test_reachability.create_initial_summary test in
+    let final_summary = Test_reachability.step_to_closure initial_summary in
+    let reachable = Test_reachability.reachable "start" "end" final_summary in
+    assert (not reachable)
+;;
+
+let simple_peek_eq_pop_test =
+  "simple_peek_eq_pop_test" >:: fun _ ->
+    let test =
+      Test_graph.empty
+      |> Test_graph.insert_edge
+        {source = "start"; target = "a"; label = First(Push(1))}
+      |> Test_graph.insert_edge
+        {source = "a"; target = "b"; label = First(PeekEq(1))}
+      |> Test_graph.insert_edge
+        {source = "b"; target = "end"; label = First(Pop(1))}
+    in
+    let initial_summary = Test_reachability.create_initial_summary test in
+    let final_summary = Test_reachability.step_to_closure initial_summary in
+    let reachable = Test_reachability.reachable "start" "end" final_summary in
+    assert reachable
+;;
+
+let simple_peek_neq_test =
+  "simple_peek_neq_test" >:: fun _ ->
+    let test =
+      Test_graph.empty
+      |> Test_graph.insert_edge
+        {source = "start"; target = "a"; label = First(Push(1))}
+      |> Test_graph.insert_edge
+        {source = "a"; target = "end"; label = First(PeekNeq(2))}
+    in
+    let initial_summary = Test_reachability.create_initial_summary test in
+    let final_summary = Test_reachability.step_to_closure initial_summary in
+    let reachable = Test_reachability.reachable "start" "end" final_summary in
+    assert reachable
+;;
+
+let simple_peek_neq_test_fail =
+  "simple_peek_neq_test_fail" >:: fun _ ->
+    let test =
+      Test_graph.empty
+      |> Test_graph.insert_edge
+        {source = "start"; target = "a"; label = First(Push(1))}
+      |> Test_graph.insert_edge
+        {source = "a"; target = "end"; label = First(PeekNeq(1))}
+    in
+    let initial_summary = Test_reachability.create_initial_summary test in
+    let final_summary = Test_reachability.step_to_closure initial_summary in
+    let reachable = Test_reachability.reachable "start" "end" final_summary in
+    assert (not reachable)
+;;
+
+let simple_peek_pred_test =
+  "simple_peek_pred_test" >:: fun _ ->
+    let test =
+      Test_graph.empty
+      |> Test_graph.insert_edge
+        {source = "start"; target = "a"; label = First(Push(-100))}
+      |> Test_graph.insert_edge
+        {source = "a"; target = "end"; label = First(PeekPred([Negative]))}
+    in
+    let initial_summary = Test_reachability.create_initial_summary test in
+    let final_summary = Test_reachability.step_to_closure initial_summary in
+    let reachable = Test_reachability.reachable "start" "end" final_summary in
+    assert (reachable)
+;;
+
+let simple_peek_pred_test_fail =
+  "simple_peek_pred_test_fail" >:: fun _ ->
+    let test =
+      Test_graph.empty
+      |> Test_graph.insert_edge
+        {source = "start"; target = "a"; label = First(Push(100))}
+      |> Test_graph.insert_edge
+        {source = "a"; target = "end"; label = First(PeekPred([Negative]))}
+    in
+    let initial_summary = Test_reachability.create_initial_summary test in
+    let final_summary = Test_reachability.step_to_closure initial_summary in
+    let reachable = Test_reachability.reachable "start" "end" final_summary in
+    assert (not reachable)
+;;
+
+let simple_search_replace_test =
+  "simple_search_replace_test" >:: fun _ ->
+    let test =
+      Test_graph.empty
+      |> Test_graph.insert_edge
+        {source = "start"; target = "b"; label = First(Push(2000))}
+      |> Test_graph.insert_edge
+        {source = "b"; target = "c"; label = First(Push(1000))}
+      |> Test_graph.insert_edge
+        {source = "c"; target = "d"; label = First(Push(-1))}
+      |> Test_graph.insert_edge
+        {source = "d"; target = "end"; label = First(SearchAndReplace(Negative, Search, Replace))}
+      |> Test_graph.insert_edge
+        {source = "e"; target = "end"; label = First(Pop(-1))}
+    in
+    let initial_summary = Test_reachability.create_initial_summary test in
+    let final_summary = Test_reachability.step_to_closure initial_summary in
+    let reachable = Test_reachability.reachable "start" "end" final_summary in
+    assert (reachable)
+;;
+
+let simple_search_replace_test_2 =
+  "simple_search_replace_test_2" >:: fun _ ->
+    let test =
+      Test_graph.empty
+      |> Test_graph.insert_edge
+        {source = "start"; target = "a"; label = First(Push(2000))}
+      |> Test_graph.insert_edge
+        {source = "a"; target = "b"; label = First(Push(3))}
+      |> Test_graph.insert_edge
+        {source = "b"; target = "c"; label = First(Push(1000))}
+      |> Test_graph.insert_edge
+        {source = "c"; target = "d"; label = First(Push(-1))}
+      |> Test_graph.insert_edge
+        {source = "d"; target = "e"; label = First(SearchAndReplace(Negative, Search, Replace))}
+      |> Test_graph.insert_edge
+        {source = "e"; target = "f"; label = First(Pop(3))}
+      |> Test_graph.insert_edge
+        {source = "f"; target = "end"; label = First(Pop(-1))}
+    in
+    let initial_summary = Test_reachability.create_initial_summary test in
+    let final_summary = Test_reachability.step_to_closure initial_summary in
+    let reachable = Test_reachability.reachable "start" "end" final_summary in
+    assert (reachable)
+;;
 
 let tests = "Test_reachability" >:::
             [
@@ -482,5 +714,13 @@ let tests = "Test_reachability" >:::
             ; square_reachable
             ; square_unreachable
             ; non_square_unreachable
+            ; simple_peek_eq_test
+            ; simple_peek_eq_test_fail
+            ; simple_peek_eq_pop_test
+            ; simple_peek_neq_test
+            ; simple_peek_neq_test_fail
+            ; simple_peek_pred_test
+            ; simple_peek_pred_test_fail
+; simple_search_replace_test
             ]
 ;;

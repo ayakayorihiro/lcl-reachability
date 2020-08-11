@@ -22,7 +22,7 @@ let concat_factor = 0.8;;
 
 (* returns a list of numbers, as well as the new count *)
 let rec create_string (p : probabilities) (curr_count : int)
-  : (int stack_action list * int)
+  : (int stack_action_lcl list * int)
   =
   let aggregate = p.terminal + p.nest + p.concat in
   let choice = Random.int aggregate in
@@ -45,7 +45,8 @@ let rec create_string (p : probabilities) (curr_count : int)
       }
     in
     let (inside, new_count) = create_string new_probabilities curr_count in
-    ([Push (new_count + 1)] @ inside @ [Pop (new_count + 1)], new_count + 1)
+    let (top : int stack_action_lcl list) = [Push (new_count + 1)] in
+    (top @ inside @ [Pop (new_count + 1)], new_count + 1)
   else
     (* let _ = print_endline "rule 3 chosen" in *)
     (* 3. s = s1 s2 *)
@@ -84,7 +85,7 @@ end;;
 
 module Generated_test_label =
 struct
-  type t = ((Generated_test_stack_elm.t, Generated_test_stack_elm.t) choice) stack_action
+  type t = ((Generated_test_stack_elm.t, Generated_test_stack_elm.t) choice) stack_action_lcl
   [@@deriving eq, ord, show]
 end;;
 
@@ -93,11 +94,12 @@ module Generated_test_graph =
 
 module Test_reachability =
   New_closure.Make
-    (Generated_test_stack_elm)(Generated_test_stack_elm)
+    (Generated_test_stack_elm)
+    (Generated_test_stack_elm)
     (Generated_test_graph);;
 
 let add_edge_w_right_stack
-    (lst : int stack_action list)
+    (lst : int stack_action_lcl list)
     (graph : Generated_test_graph.t)
     (curr_last_node : int)
   =
@@ -115,7 +117,7 @@ let add_edge_w_right_stack
 ;;
 
 let add_edge_w_left_stack
-    (lst : int stack_action list)
+    (lst : int stack_action_lcl list)
     (graph : Generated_test_graph.t)
     (curr_last_node : int)
   =
@@ -135,8 +137,8 @@ let add_edge_w_left_stack
 
 (* Function creating single interleaving graph *)
 let rec create_interleaving_graph
-    (lst_1 : int stack_action list)
-    (lst_2 : int stack_action list)
+    (lst_1 : int stack_action_lcl list)
+    (lst_2 : int stack_action_lcl list)
     (graph : Generated_test_graph.t)
     (curr_last_node : int)
   : (Generated_test_graph.t * int)

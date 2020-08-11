@@ -8,14 +8,14 @@ end;;
 
 module type StackElementPredicates =
 sig
-    type t;;
-    module Grammar : Stack_grammar;;
-    val exec_pred : t -> Grammar.t -> bool;;
-    (*FIXME: check this w Zach, there might be a better way to do this? *)
-    val equal : t -> t -> bool
-    val compare : t -> t -> int
-    val show : t -> string
-    val pp : Format.formatter -> t -> unit;;
+  type t;;
+  module Grammar : Stack_grammar;;
+  val exec_pred : t -> Grammar.t -> bool;;
+  (*FIXME: check this w Zach, there might be a better way to do this? *)
+  val equal : t -> t -> bool
+  val compare : t -> t -> int
+  val show : t -> string
+  val pp : Format.formatter -> t -> unit;;
 end;;
 
 (* equivalent to Haskell Either *)
@@ -41,6 +41,10 @@ type stack_specification =
 ;;
 
 type ('a) stack_action_lcl =
+  (* NOTE: This is here so that the previous implementations
+     work without me having to change the types in all of them.
+     We'll see if it comes back to bite me?
+  *)
   | Push of 'a
   | Pop of 'a
   | Epsilon
