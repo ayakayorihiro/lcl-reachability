@@ -1,0 +1,19 @@
+(library
+  (name odefa_ast)
+  (public_name lcl_reachability.ast)
+  (synopsis "AST for Odefa")
+  (libraries
+    batteries
+    jhupllib
+    ppx_deriving_yojson.runtime
+  )
+  (preprocess
+    (pps
+      ppx_deriving.std
+      ppx_deriving_yojson
+    )
+  )
+  (flags
+    (:standard -w -39) ;for ppx_deriving_yojson, which generates extra rec flags
+  )
+)

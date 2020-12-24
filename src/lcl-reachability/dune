@@ -6,6 +6,7 @@
     batteries
     jhupllib
     monadlib
+    lcl_reachability.ast
   )
   (preprocess
     (pps

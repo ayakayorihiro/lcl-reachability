@@ -37,6 +37,15 @@ sig
 
   val get_reachable_nodes : G.Node.t -> summary -> G.Node.t Enum.t
 
+  (* retuns pair btwn G.Node.t and a stack grammar trinary *)
+  val get_examine_result_nodes : G.Node.t -> summary ->
+    (G.Node.t * ((Stack1.t, Stack2.t, Stack3.t) trinary)) Enum.t
+
+  (* Adds edge to (inner) graph routine so that outside system can add edges after examining *)
+  val add_new_edge :  G.edge -> summary -> summary
+
+  val add_new_subgraph : G.t -> summary -> summary
+
 end;;
 
 module Make
@@ -295,182 +304,184 @@ struct
     } [@@deriving show];;
   let _ = pp_summary;;
 
+  let og_edge_conversion (e : G.edge) : Reachability_graph.edge =
+    let l = e.G.label in
+    let new_label =
+      match l with
+      | First (sa) ->
+        begin
+          match sa with
+          | Push (x) ->
+            let push_dstm_state =
+              { dstm_complete = false; dstm_operation = NoOp}
+            in
+            (push_dstm_state, TapeStackElement(First(x)), Original)
+          | Pop (x) ->
+            let pop_dstm_state =
+              { dstm_complete = true; dstm_operation = Pop(First(x))}
+            in
+            (pop_dstm_state, TapeHash, Original)
+          | Epsilon ->
+            (* We are just happy w all Epsilons. They are just there. Very wholesome *)
+            let epsilon_dstm_state =
+              { dstm_complete = true; dstm_operation = NoOp}
+            in
+            (epsilon_dstm_state, TapeHash, Original)
+          | PeekEq (x) ->
+            let peekeq_dstm_state =
+              { dstm_complete = true; dstm_operation = PeekEq(First(x))}
+            in
+            (peekeq_dstm_state, TapeHash, Original)
+          | PeekNeq (x) ->
+            let peekneq_dstm_state =
+              { dstm_complete = true; dstm_operation = PeekNeq(First(x))}
+            in
+            (peekneq_dstm_state, TapeHash, Original)
+          | PeekPred (p) ->
+            let peekpred_dstm_state =
+              { dstm_complete = true; dstm_operation = PeekPred(First(p))}
+            in
+            (peekpred_dstm_state, TapeHash, Original)
+          | SearchAndReplace (p1, p2, p3) ->
+            let sar_dstm_state =
+              { dstm_complete = true; dstm_operation = SearchAndReplaceStep1(First(p1, p2, p3))}
+            in
+            (sar_dstm_state, TapeHash, Original)
+          | Examine ->
+            let examine_dstm_state =
+              { dstm_complete = true; dstm_operation = Examine(First_stack)}
+            in
+            (examine_dstm_state, TapeHash, Original)
+        end
+      | Second (sa) ->
+        begin
+          match sa with
+          | Push (x) ->
+            let push_dstm_state =
+              { dstm_complete = false; dstm_operation = NoOp}
+            in
+            (push_dstm_state, TapeStackElement(Second(x)), Original)
+          | Pop (x) ->
+            let pop_dstm_state =
+              { dstm_complete = true; dstm_operation = Pop(Second(x))}
+            in
+            (pop_dstm_state, TapeHash, Original)
+          | Epsilon ->
+            (* We are just happy w all Epsilons. They are just there. Very wholesome *)
+            let epsilon_dstm_state =
+              { dstm_complete = true; dstm_operation = NoOp}
+            in
+            (epsilon_dstm_state, TapeHash, Original)
+          | PeekEq (x) ->
+            let peekeq_dstm_state =
+              { dstm_complete = true; dstm_operation = PeekEq(Second(x))}
+            in
+            (peekeq_dstm_state, TapeHash, Original)
+          | PeekNeq (x) ->
+            let peekneq_dstm_state =
+              { dstm_complete = true; dstm_operation = PeekNeq(Second(x))}
+            in
+            (peekneq_dstm_state, TapeHash, Original)
+          | PeekPred (p) ->
+            let peekpred_dstm_state =
+              { dstm_complete = true; dstm_operation = PeekPred(Second(p))}
+            in
+            (peekpred_dstm_state, TapeHash, Original)
+          | SearchAndReplace (p1, p2, p3) ->
+            let sar_dstm_state =
+              { dstm_complete = true; dstm_operation = SearchAndReplaceStep1(Second(p1, p2, p3))}
+            in
+            (sar_dstm_state, TapeHash, Original)
+          | Examine ->
+            let examine_dstm_state =
+              { dstm_complete = true; dstm_operation = Examine(Second_stack)}
+            in
+            (examine_dstm_state, TapeHash, Original)
+        end
+      | Third (sa) ->
+        begin
+          match sa with
+          | Push (x) ->
+            let push_dstm_state =
+              { dstm_complete = false; dstm_operation = NoOp}
+            in
+            (push_dstm_state, TapeStackElement(Third(x)), Original)
+          | Pop (x) ->
+            let pop_dstm_state =
+              { dstm_complete = true; dstm_operation = Pop(Third(x))}
+            in
+            (pop_dstm_state, TapeHash, Original)
+          | Epsilon ->
+            (* We are just happy w all Epsilons. They are just there. Very wholesome *)
+            let epsilon_dstm_state =
+              { dstm_complete = true; dstm_operation = NoOp}
+            in
+            (epsilon_dstm_state, TapeHash, Original)
+          | PeekEq (x) ->
+            let peekeq_dstm_state =
+              { dstm_complete = true; dstm_operation = PeekEq(Third(x))}
+            in
+            (peekeq_dstm_state, TapeHash, Original)
+          | PeekNeq (x) ->
+            let peekneq_dstm_state =
+              { dstm_complete = true; dstm_operation = PeekNeq(Third(x))}
+            in
+            (peekneq_dstm_state, TapeHash, Original)
+          | PeekPred (p) ->
+            let peekpred_dstm_state =
+              { dstm_complete = true; dstm_operation = PeekPred(Third(p))}
+            in
+            (peekpred_dstm_state, TapeHash, Original)
+          | SearchAndReplace (p1, p2, p3) ->
+            let sar_dstm_state =
+              { dstm_complete = true; dstm_operation = SearchAndReplaceStep1(Third(p1, p2, p3))}
+            in
+            (sar_dstm_state, TapeHash, Original)
+          | Examine ->
+            let examine_dstm_state =
+              { dstm_complete = true; dstm_operation = Examine(Third_stack)}
+            in
+            (examine_dstm_state, TapeHash, Original)
+        end
+    in
+    {
+      Reachability_graph.source = e.G.source;
+      Reachability_graph.target = e.G.target;
+      Reachability_graph.label = new_label
+    }
+  ;;
+
+  (* This function is the function we pass into fold for create_initial_summary,
+     and I'm using pairs so that we only go through one pass, but I'm not quite
+     sure if this is the best thing to do? *)
+  let worklist_map_setup_fun
+      (acc : (Reachability_graph.edge list * Node_NL_set_multimap.t * Node_NL_set_multimap.t))
+      (new_edge : Reachability_graph.edge)
+    : Reachability_graph.edge list * Node_NL_set_multimap.t * Node_NL_set_multimap.t =
+    let (worklist_acc, incoming_acc, outgoing_acc) = acc in
+    let w = List.append worklist_acc [new_edge] in
+    let srclab_pair = (new_edge.source, new_edge.label) in
+    let im =
+      Node_NL_set_multimap.add new_edge.target srclab_pair incoming_acc
+    in
+    let tgtlab_pair = (new_edge.target, new_edge.label) in
+    let om =
+      Node_NL_set_multimap.add new_edge.source tgtlab_pair outgoing_acc
+    in
+    (w, im, om)
+  ;;
+
   let create_initial_summary (input_graph : G.t) : summary =
     (* 1. Get all of the edges in the original graph *)
     let og_edges = G.get_all_edges input_graph in
     let reachability_edges =
       og_edges
-      |> Enum.map
-        (fun e ->
-           let l = e.G.label in
-           let new_label =
-             match l with
-             | First (sa) ->
-               begin
-                 match sa with
-                 | Push (x) ->
-                   let push_dstm_state =
-                     { dstm_complete = false; dstm_operation = NoOp}
-                   in
-                   (push_dstm_state, TapeStackElement(First(x)), Original)
-                 | Pop (x) ->
-                   let pop_dstm_state =
-                     { dstm_complete = true; dstm_operation = Pop(First(x))}
-                   in
-                   (pop_dstm_state, TapeHash, Original)
-                 | Epsilon ->
-                   (* We are just happy w all Epsilons. They are just there. Very wholesome *)
-                   let epsilon_dstm_state =
-                     { dstm_complete = true; dstm_operation = NoOp}
-                   in
-                   (epsilon_dstm_state, TapeHash, Original)
-                 | PeekEq (x) ->
-                   let peekeq_dstm_state =
-                     { dstm_complete = true; dstm_operation = PeekEq(First(x))}
-                   in
-                   (peekeq_dstm_state, TapeHash, Original)
-                 | PeekNeq (x) ->
-                   let peekneq_dstm_state =
-                     { dstm_complete = true; dstm_operation = PeekNeq(First(x))}
-                   in
-                   (peekneq_dstm_state, TapeHash, Original)
-                 | PeekPred (p) ->
-                   let peekpred_dstm_state =
-                     { dstm_complete = true; dstm_operation = PeekPred(First(p))}
-                   in
-                   (peekpred_dstm_state, TapeHash, Original)
-                 | SearchAndReplace (p1, p2, p3) ->
-                   let sar_dstm_state =
-                     { dstm_complete = true; dstm_operation = SearchAndReplaceStep1(First(p1, p2, p3))}
-                   in
-                   (sar_dstm_state, TapeHash, Original)
-                 | Examine ->
-                   let examine_dstm_state =
-                     { dstm_complete = true; dstm_operation = Examine(First_stack)}
-                   in
-                   (examine_dstm_state, TapeHash, Original)
-               end
-             | Second (sa) ->
-               begin
-                 match sa with
-                 | Push (x) ->
-                   let push_dstm_state =
-                     { dstm_complete = false; dstm_operation = NoOp}
-                   in
-                   (push_dstm_state, TapeStackElement(Second(x)), Original)
-                 | Pop (x) ->
-                   let pop_dstm_state =
-                     { dstm_complete = true; dstm_operation = Pop(Second(x))}
-                   in
-                   (pop_dstm_state, TapeHash, Original)
-                 | Epsilon ->
-                   (* We are just happy w all Epsilons. They are just there. Very wholesome *)
-                   let epsilon_dstm_state =
-                     { dstm_complete = true; dstm_operation = NoOp}
-                   in
-                   (epsilon_dstm_state, TapeHash, Original)
-                 | PeekEq (x) ->
-                   let peekeq_dstm_state =
-                     { dstm_complete = true; dstm_operation = PeekEq(Second(x))}
-                   in
-                   (peekeq_dstm_state, TapeHash, Original)
-                 | PeekNeq (x) ->
-                   let peekneq_dstm_state =
-                     { dstm_complete = true; dstm_operation = PeekNeq(Second(x))}
-                   in
-                   (peekneq_dstm_state, TapeHash, Original)
-                 | PeekPred (p) ->
-                   let peekpred_dstm_state =
-                     { dstm_complete = true; dstm_operation = PeekPred(Second(p))}
-                   in
-                   (peekpred_dstm_state, TapeHash, Original)
-                 | SearchAndReplace (p1, p2, p3) ->
-                   let sar_dstm_state =
-                     { dstm_complete = true; dstm_operation = SearchAndReplaceStep1(Second(p1, p2, p3))}
-                   in
-                   (sar_dstm_state, TapeHash, Original)
-                 | Examine ->
-                   let examine_dstm_state =
-                     { dstm_complete = true; dstm_operation = Examine(Second_stack)}
-                   in
-                   (examine_dstm_state, TapeHash, Original)
-               end
-             | Third (sa) ->
-               begin
-                 match sa with
-                 | Push (x) ->
-                   let push_dstm_state =
-                     { dstm_complete = false; dstm_operation = NoOp}
-                   in
-                   (push_dstm_state, TapeStackElement(Third(x)), Original)
-                 | Pop (x) ->
-                   let pop_dstm_state =
-                     { dstm_complete = true; dstm_operation = Pop(Third(x))}
-                   in
-                   (pop_dstm_state, TapeHash, Original)
-                 | Epsilon ->
-                   (* We are just happy w all Epsilons. They are just there. Very wholesome *)
-                   let epsilon_dstm_state =
-                     { dstm_complete = true; dstm_operation = NoOp}
-                   in
-                   (epsilon_dstm_state, TapeHash, Original)
-                 | PeekEq (x) ->
-                   let peekeq_dstm_state =
-                     { dstm_complete = true; dstm_operation = PeekEq(Third(x))}
-                   in
-                   (peekeq_dstm_state, TapeHash, Original)
-                 | PeekNeq (x) ->
-                   let peekneq_dstm_state =
-                     { dstm_complete = true; dstm_operation = PeekNeq(Third(x))}
-                   in
-                   (peekneq_dstm_state, TapeHash, Original)
-                 | PeekPred (p) ->
-                   let peekpred_dstm_state =
-                     { dstm_complete = true; dstm_operation = PeekPred(Third(p))}
-                   in
-                   (peekpred_dstm_state, TapeHash, Original)
-                 | SearchAndReplace (p1, p2, p3) ->
-                   let sar_dstm_state =
-                     { dstm_complete = true; dstm_operation = SearchAndReplaceStep1(Third(p1, p2, p3))}
-                   in
-                   (sar_dstm_state, TapeHash, Original)
-                 | Examine ->
-                   let examine_dstm_state =
-                     { dstm_complete = true; dstm_operation = Examine(Third_stack)}
-                   in
-                   (examine_dstm_state, TapeHash, Original)
-               end
-           in
-           {
-             Reachability_graph.source = e.G.source;
-             Reachability_graph.target = e.G.target;
-             Reachability_graph.label = new_label
-           }
-        )
+      |> Enum.map og_edge_conversion
       |> List.of_enum
     in
     (* 2. For each edge, create edge in new graph *)
     (* 3. For each edge, we add it to both incoming and outgoing og edge multimaps
        for faster lookup *)
-    (* This function is the function we pass into fold, and I'm using pairs
-       so that we only go through one pass, but I'm not quite sure if this
-       is the best thing to do? *)
-    let worklist_map_setup_fun
-        (acc : (Reachability_graph.edge list * Node_NL_set_multimap.t * Node_NL_set_multimap.t))
-        (new_edge : Reachability_graph.edge)
-      : Reachability_graph.edge list * Node_NL_set_multimap.t * Node_NL_set_multimap.t =
-      let (worklist_acc, incoming_acc, outgoing_acc) = acc in
-      let w = List.append worklist_acc [new_edge] in
-      let srclab_pair = (new_edge.source, new_edge.label) in
-      let im =
-        Node_NL_set_multimap.add new_edge.target srclab_pair incoming_acc
-      in
-      let tgtlab_pair = (new_edge.target, new_edge.label) in
-      let om =
-        Node_NL_set_multimap.add new_edge.source tgtlab_pair outgoing_acc
-      in
-      (w, im, om)
-    in
     let (new_worklist, new_incoming_og_map, new_outgoing_og_map) =
       List.fold_left
         worklist_map_setup_fun
@@ -500,7 +511,7 @@ struct
              match s with
              | First _ -> (* Still sth on the first stack --> B *)
                Some ({q with dstm_complete = false}, z)
-             | _ ->
+             | Second _ | Third _ ->
                Some (q, z)
            end
         )
@@ -522,7 +533,7 @@ struct
                    Some ({ dstm_complete = true; dstm_operation = NoOp}, TapeHash)
                  else
                    None
-               | _ ->
+               | Second _ | Third _ ->
                  Some (q, z) (* D8, D9 *)
               )
           )
@@ -572,7 +583,7 @@ struct
                  if (q_fst = tse_fst) then
                    Some ({q with dstm_operation = NoOp}, z)
                  else None
-               | _ ->
+               | Second _ | Third _ ->
                  Some (q, z)
              end
           )
@@ -588,7 +599,7 @@ struct
                  if (q_snd = tse_snd) then
                    Some ({q with dstm_operation = NoOp}, z)
                  else None
-               | _ -> Some (q, z)
+               | Third _ -> Some (q, z)
              end
           )
         | Third (q_thd) ->
@@ -603,7 +614,7 @@ struct
                  if (q_thd = tse_thd) then
                    Some ({q with dstm_operation = NoOp}, z)
                  else None
-               | _ -> Some (q, z)
+               | Second _ -> Some (q, z)
              end
           )
       end
@@ -620,7 +631,7 @@ struct
                  if (not (q_fst = tse_fst)) then
                    Some ({q with dstm_operation = NoOp}, z)
                  else None
-               | _ ->
+               | Second _ | Third _ ->
                  Some (q, z)
              end
           )
@@ -636,7 +647,7 @@ struct
                  if (not (q_snd = tse_snd)) then
                    Some ({q with dstm_operation = NoOp}, z)
                  else None
-               | _ -> Some (q, z)
+               | Third _ -> Some (q, z)
              end
           )
         | Third (q_thd) ->
@@ -651,7 +662,7 @@ struct
                  if (not (q_thd = tse_thd)) then
                    Some ({q with dstm_operation = NoOp}, z)
                  else None
-               | _ -> Some (q, z)
+               | Second _ -> Some (q, z)
              end
           )
       end
@@ -675,7 +686,7 @@ struct
                       Some ({q with dstm_operation = PeekPred(First(preds_tl))}, z)
                    )
                  else None
-               | _ -> Some (q, z)
+               | Second _ | Third _ -> Some (q, z)
              end
           )
         | Second (preds_snd) ->
@@ -697,7 +708,7 @@ struct
                       Some ({q with dstm_operation = PeekPred(Second(preds_tl))}, z)
                    )
                  else None
-               | _ -> Some (q, z)
+               | Third _ -> Some (q, z)
              end
           )
         | Third (preds_thd) ->
@@ -719,7 +730,7 @@ struct
                       Some ({q with dstm_operation = PeekPred(Third(preds_tl))}, z)
                    )
                  else None
-               | _ -> Some (q, z)
+               | Second _ -> Some (q, z)
              end
           )
       end
@@ -737,7 +748,7 @@ struct
                  then
                    Some ({q with dstm_operation = SearchAndReplaceStep2(First(tse_fst, p2, p3))}, TapeHash)
                  else None (* topmost stack element didn't fit the predicate, we blow up *)
-               | _ -> Some (q, z)
+               | Second _ | Third _ -> Some (q, z)
              end
           )
         | Second (p1, p2, p3) ->
@@ -753,7 +764,7 @@ struct
                  then
                    Some ({q with dstm_operation = SearchAndReplaceStep2(Second(tse_snd, p2, p3))}, TapeHash)
                  else None (* topmost stack element didn't fit the predicate, we blow up *)
-               | _ -> Some (q, z)
+               | Third _ -> Some (q, z)
              end
           )
         | Third (p1, p2, p3) ->
@@ -769,7 +780,7 @@ struct
                  then
                    Some ({q with dstm_operation = SearchAndReplaceStep2(Third(tse_thd, p2, p3))}, TapeHash)
                  else None (* topmost stack element didn't fit the predicate, we blow up *)
-               | _ -> Some (q, z)
+               | Second _ -> Some (q, z)
              end
           )
       end
@@ -787,7 +798,7 @@ struct
                  then
                    Some ({q with dstm_operation = SearchAndReplaceStep3(First(se, p2))}, TapeHash)
                  else None
-               | _ -> Some (q, z)
+               | Second _ | Third _ -> Some (q, z)
              end
           )
         | Second (se, p1, p2) ->
@@ -803,7 +814,7 @@ struct
                  then
                    Some ({q with dstm_operation = SearchAndReplaceStep3(Second(se, p2))}, TapeHash)
                  else None
-               | _ -> Some (q, z)
+               | Third _ -> Some (q, z)
              end
           )
         | Third (se, p1, p2) ->
@@ -819,7 +830,7 @@ struct
                  then
                    Some ({q with dstm_operation = SearchAndReplaceStep3(Third(se, p2))}, TapeHash)
                  else None
-               | _ -> Some (q, z)
+               | Second _ -> Some (q, z)
              end
           )
       end
@@ -846,7 +857,7 @@ struct
                  else (* THIS IS VALID, keep on with the search *)
                    (* BUT scream about first stack *)
                    Some ({q with dstm_complete = false}, z)
-               | _ -> Some (q, z)
+               | Second _ | Third _ -> Some (q, z)
              end
           )
         | Second (se, p) ->
@@ -862,7 +873,7 @@ struct
                    Some ({q with dstm_operation = NoOp}, TapeStackElement(Second(se)))
                  else (* THIS IS VALID, keep on with the search *)
                    Some (q, z)
-               | _ -> Some (q, z)
+               | Third _ -> Some (q, z)
              end
           )
         | Third (se, p) ->
@@ -878,7 +889,7 @@ struct
                    Some ({q with dstm_operation = NoOp}, TapeStackElement(Third(se)))
                  else (* THIS IS VALID, keep on with the search *)
                    Some (q, z)
-               | _ -> Some (q, z)
+               | Second _ -> Some (q, z)
              end
           )
       end
@@ -893,7 +904,7 @@ struct
                match tse with
                | First _ ->
                  Some ({q with dstm_operation = ExamineResult (tse)}, z)
-               | _ -> Some (q, z)
+               | Second _ | Third _ -> Some (q, z)
              end
           )
         | Second_stack ->
@@ -904,7 +915,7 @@ struct
                match tse with
                | Second _ ->
                  Some ({q with dstm_operation = ExamineResult (tse)}, z)
-               | _ -> Some (q, z)
+               | First _ | Third _ -> Some (q, z)
              end
           )
         | Third_stack ->
@@ -915,7 +926,7 @@ struct
                match tse with
                | Third _ ->
                  Some ({q with dstm_operation = ExamineResult (tse)}, z)
-               | _ -> Some (q, z)
+               | Second _ | First _ -> Some (q, z)
              end
           )
       end
@@ -1152,7 +1163,7 @@ struct
                       )
                       (N.show v1) (N.show v3)
                       (L.show v1_v3_label)        );
-    logger `trace (fun () -> Printf.sprintf
+       logger `trace (fun () -> Printf.sprintf
                       ("\n===========================================\n"
                       )
                       ); *)
@@ -1311,6 +1322,7 @@ struct
   let get_reachable_nodes (src : G.Node.t) (s : summary) : G.Node.t Enum.t =
     let summary_graph = s.graph in
     let src_outgoing_neighbors = Reachability_graph.get_outgoing_neighbors src summary_graph in
+    (* NOTE: maybe make this a dictionary? instead of doing filter map *)
     Enum.filter_map (fun (n, l) ->
         match l with
         | (state, _, _) ->
@@ -1324,6 +1336,46 @@ struct
       src_outgoing_neighbors
   ;;
 
+  let get_examine_result_nodes (src : G.Node.t) (s : summary) :
+    (G.Node.t * ((Stack1.t, Stack2.t, Stack3.t) trinary)) Enum.t
+    =
+    let summary_graph = s.graph in
+    let src_outgoing_neighbors = Reachability_graph.get_outgoing_neighbors src summary_graph in
+    (* NOTE: maybe make this a dictionary? instead of doing filter map *)
+    Enum.filter_map (fun (n, l) ->
+        match l with
+        | (state, _, _) ->
+          begin
+            match state.dstm_operation with
+            | ExamineResult (se) ->
+              Some (n, se)
+            | _ -> None
+          end
+      )
+      src_outgoing_neighbors
+  ;;
+
+  let add_new_edge (og_edge : G.edge) (s : summary)
+    : summary =
+    let new_edge = og_edge_conversion og_edge in
+    let (new_worklist, new_incoming_og_map, new_outgoing_og_map) =
+      worklist_map_setup_fun
+        (s.worklist, s.incoming_og_edges_map, s.outgoing_og_edges_map)
+        new_edge
+    in
+    { s with
+      worklist = new_worklist;
+      incoming_og_edges_map = new_incoming_og_map;
+      outgoing_og_edges_map = new_outgoing_og_map
+    }
+  ;;
+
+  let add_new_subgraph (input_subgraph : G.t) (s : summary) : summary =
+    let flip = fun f -> fun fst -> fun snd ->
+      f snd fst
+    in
+    Enum.fold (flip add_new_edge) s (G.get_all_edges input_subgraph)
+  ;;
 
 
 end;;
